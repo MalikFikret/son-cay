@@ -5,12 +5,13 @@
 // (watchLobby). The current host edits the general match settings; everyone else sees them as a
 // summary. Every listener, presence and timer stops when the screen is left.
 //
-// Not built yet (visible but disabled, as in the design): Tablo, the seat order, the player
-// options and starting the match. While a match runs, a temporary "Maç sürüyor" panel is shown.
+// The host also orders the seats, starts the match (after an absent-players check) and manages
+// players through the "⋯" options; a player renames themself there. Tablo shows the last match
+// and the session. While a match runs, a temporary "Maç sürüyor" panel is shown.
 
 import { h } from '../dom.js';
 import { copyText, errorLine, icon, screen } from '../components.js';
-import { FORM_MESSAGES, errorMessage } from '../messages.js';
+import { FORM_MESSAGES, TEXT, errorMessage } from '../messages.js';
 import { inviteLink } from '../routes.js';
 import {
   MODE_HINTS,
@@ -21,8 +22,10 @@ import {
   defaultsFor,
   formatPoints,
   normalizeSettings,
+  playerOptions,
   playerRows,
   sameSettings,
+  startCheck,
   stepSetting,
   toggleTool,
   toolCounter,
@@ -30,6 +33,8 @@ import {
 } from '../lobby-model.js';
 import { createSettingsSync } from '../settings-sync.js';
 import { toolIcon } from '../tools.js';
+import { createOptionsSheet, createSeatOrderSheet, createStartSheet } from '../lobby-sheets.js';
+import { createTablo } from '../tablo.js';
 import { ROOM_ERR } from '../../rooms/index.js';
 
 const LOST_CODES = [ROOM_ERR.SEAT_LOST, ROOM_ERR.NOT_MEMBER, ROOM_ERR.ROOM_NOT_FOUND];
@@ -48,17 +53,19 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
   let hostUi = null; // the host's settings controls (refs), while I am the host
   let sync = null; // coalesced settings writes, while I am the host
   let leaving = false;
+  let starting = false; // a startMatch call is in flight
   let ended = false;
 
   // --- Static parts --------------------------------------------------------------------------
   const subtitle = h('span', { class: 'header-sub', text: 'Bekleme salonu' });
   const leaveButton = h('button', { type: 'button', class: 'btn-small', text: 'Çık', on: { click: askToLeave } });
+  const tabloButton = h('button', { type: 'button', class: 'btn-small btn-small-accent', on: { click: () => tablo.open() } }, icon('table'), TEXT.tablo);
   const topBar = h('header', { class: 'lobby-top' },
     h('div', { class: 'header-text' },
       h('h1', { class: 'lobby-title', text: 'Son Çay' }),
       subtitle),
     h('div', { class: 'lobby-top-actions' },
-      h('button', { type: 'button', class: 'btn-small btn-small-accent', disabled: true, title: 'Yakında' }, icon('table'), 'Tablo'),
+      tabloButton,
       leaveButton));
 
   const copyStatus = h('p', { class: 'field-error status-line', role: 'status', hidden: true });
@@ -72,8 +79,8 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
     copyStatus);
 
   const playersList = h('ul', { class: 'player-list', 'aria-labelledby': 'players-title' });
-  const seatOrderNote = h('span', { class: 'hint', text: 'Oturma sırası: rastgele' });
-  const seatOrderButton = h('button', { type: 'button', class: 'link-button', disabled: true, title: 'Yakında', text: 'Oturma sırasını elle düzenle' });
+  const seatOrderNote = h('span', { class: 'hint', text: TEXT.seatOrderRandom });
+  const seatOrderButton = h('button', { type: 'button', class: 'link-button', text: TEXT.editSeatOrder, hidden: true, on: { click: () => seatOrderSheet.open(currentRows) } });
   const playersSection = h('section', { class: 'lobby-section' },
     h('div', { class: 'section-head' },
       h('h2', { class: 'section-title', id: 'players-title', text: 'Oyuncular' }),
@@ -103,6 +110,15 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
   const confirmDialog = buildLeaveDialog();
   const root = screen('screen-lobby', topBar, loadingLine, body, bottom, confirmDialog.el);
 
+  // Bottom sheets and the Tablo (each destroyed when the screen is left).
+  const sheetCtx = { api: ctx.api, uid: ctx.uid, code };
+  const optionsSheet = createOptionsSheet(sheetCtx);
+  const seatOrderSheet = createSeatOrderSheet(sheetCtx);
+  const startSheet = createStartSheet({ ...sheetCtx, onStart: () => ctx.api.startMatch({ uid: ctx.uid, code }) });
+  const tablo = createTablo({ mySeat, loadLastMatch: () => ctx.api.getLastMatch({ uid: ctx.uid, code }) });
+  let currentRows = [];
+  const optionsOf = (row) => playerOptions(row, { mySeat, hostSeat: lobby?.meta.hostSeat, inLobby: lobby?.meta.status === 'lobby' });
+
   // --- Live parts ----------------------------------------------------------------------------
   function start() {
     try {
@@ -126,6 +142,10 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
       }
     }
     confirmDialog.close();
+    optionsSheet.destroy();
+    seatOrderSheet.destroy();
+    startSheet.destroy();
+    tablo.destroy();
   }
 
   view.onLeave(() => {
@@ -158,12 +178,24 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
       scores: next.scores,
       hostSeat: next.meta.hostSeat,
       mySeat,
+      seatOrder: next.seatOrder,
     });
+    currentRows = rows;
     subtitle.textContent = `Bekleme salonu · ${rows.length} oyuncu`;
+    seatOrderNote.textContent = next.seatOrder ? TEXT.seatOrderManual : TEXT.seatOrderRandom;
+    const host = next.meta.hostSeat === mySeat;
+    const inLobby = next.meta.status === 'lobby';
+    optionsSheet.sync(rows, optionsOf);
+    seatOrderSheet.sync(rows, host && inLobby);
+    startSheet.sync(rows, host, inLobby);
+    tablo.update(next.session, Object.fromEntries(rows.map((row) => [row.seatId, row.name])));
 
     const playing = next.meta.status === 'playing';
     // Leaving is possible only between matches (leaveRoom refuses with NOT_IN_LOBBY).
     leaveButton.disabled = playing;
+    // During a match the Tablo belongs to the table screen (next step).
+    tabloButton.disabled = playing;
+    if (playing) tablo.close();
     leaveButton.title = playing ? 'Maç sırasında masadan çıkılamaz' : '';
     playingNotice.hidden = !playing;
     playersSection.hidden = playing;
@@ -187,9 +219,17 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
         h('span', { class: 'player-name', text: row.name }),
         row.tagLine ? h('span', { class: row.me ? 'player-tag is-me' : 'player-tag', text: row.tagLine }) : null),
       h('span', { class: 'player-points', text: formatPoints(row.points) }),
-      isHost
-        ? h('button', { type: 'button', class: 'icon-button', disabled: true, title: 'Yakında', 'aria-label': `${row.name} için seçenekler` }, icon('dots'))
-        : null)));
+      optionsButton(row))));
+  }
+
+  // "⋯": only when the viewer has something to do with this row (playerOptions).
+  function optionsButton(row) {
+    const options = optionsOf(row);
+    if (options.length === 0) return null;
+    return h('button', {
+      type: 'button', class: 'icon-button', 'aria-label': TEXT.optionsFor(row.name),
+      on: { click: () => optionsSheet.open(row, options) },
+    }, icon('dots'));
   }
 
   // --- Role: host controls or player summary ---------------------------------------------------
@@ -197,7 +237,6 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
     const hostName = rows.find((row) => row.host)?.name ?? '';
     if (host !== isHost) {
       isHost = host;
-      seatOrderNote.hidden = !host;
       seatOrderButton.hidden = !host;
       settingsError.clear();
       if (host) {
@@ -221,9 +260,10 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
 
   function renderBottom(host, hostName) {
     if (host) {
-      bottom.replaceChildren(
-        h('button', { type: 'button', class: 'btn-start', disabled: true, title: 'Yakında', text: 'Maçı başlat' }),
-        h('span', { class: 'hint center', text: 'Bağlantısı olmayanlar da maça dahil olur. En az 3 oyuncu gerekir.' }));
+      const { canStart } = startCheck(currentRows);
+      const button = h('button', { type: 'button', class: 'btn-start', text: starting ? TEXT.starting : TEXT.startMatch, disabled: !canStart || starting, 'aria-describedby': 'start-note' });
+      button.addEventListener('click', () => startMatch(button));
+      bottom.replaceChildren(button, h('span', { class: 'hint center', id: 'start-note', text: canStart ? TEXT.startNote : TEXT.startTooFew }));
     } else {
       bottom.replaceChildren(h('div', { class: 'waiting-line', role: 'status' },
         icon('clock'),
@@ -345,6 +385,31 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
         items.flatMap(([label, value]) => [h('dt', { text: label }), h('dd', { text: value })])),
       toggle,
       list));
+  }
+
+  // --- Starting the match --------------------------------------------------------------------
+  // With absent players, first the check sheet; otherwise straight away. Everyone seated plays.
+  async function startMatch(button) {
+    if (button.disabled) return;
+    const { canStart, absent } = startCheck(currentRows);
+    if (!canStart) return;
+    if (absent.length > 0) {
+      startSheet.open(currentRows);
+      return;
+    }
+    starting = true;
+    button.disabled = true;
+    button.textContent = TEXT.starting;
+    pageError.clear();
+    try {
+      await ctx.api.startMatch({ uid: ctx.uid, code });
+    } catch (failure) {
+      if (!view.active()) return;
+      pageError.show(errorMessage(failure));
+    } finally {
+      starting = false;
+      if (view.active() && lobby?.meta.status === 'lobby') renderBottom(lobby.meta.hostSeat === mySeat, currentRows.find((row) => row.host)?.name ?? '');
+    }
   }
 
   // --- A match is running (temporary) -------------------------------------------------------

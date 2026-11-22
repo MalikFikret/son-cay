@@ -18,6 +18,7 @@ export const ROOM_MESSAGES = Object.freeze({
   [ROOM_ERR.WRONG_PIN]: 'Şifre yanlış.',
   [ROOM_ERR.RETRY_LATER]: 'Çok sık denendi. Biraz bekle, sonra tekrar dene.',
   [ROOM_ERR.INVALID_SEAT]: 'Önce listeden adını seç.',
+  [ROOM_ERR.INVALID_SEAT_ORDER]: 'Oturma sırası geçersiz.',
   [ROOM_ERR.SEAT_EMPTY]: 'Bu yer artık boş.',
   [ROOM_ERR.ALREADY_MEMBER]: 'Bu masada zaten başka bir yerin var.',
   [ROOM_ERR.NOT_MEMBER]: 'Bu masada artık yerin yok.',
@@ -76,3 +77,75 @@ export function errorMessage(error) {
 /** Errors after which the recover button waits (the rules allow one claim per seat every 2 s). */
 export const RETRY_WAIT_CODES = Object.freeze([ROOM_ERR.WRONG_PIN, ROOM_ERR.RETRY_LATER]);
 export const RETRY_WAIT_SECONDS = 2;
+
+/**
+ * Texts of the waiting room's options, seat order, start and Tablo (functions take values that
+ * are inserted as text, never as markup). Player names are never put inside a word: Turkish
+ * suffixes depend on the name, so the texts say "adlı oyuncu" instead.
+ */
+export const TEXT = Object.freeze({
+  // Seat order
+  seatOrderRandom: 'Oturma sırası: rastgele',
+  seatOrderManual: 'Oturma sırası: elle',
+  editSeatOrder: 'Oturma sırasını elle düzenle',
+  seatOrderTitle: 'Oturma sırası',
+  seatOrderHint: 'Oklarla sırala. Sonradan oturanlar sona eklenir.',
+  moveUp: (name) => `${name}: yukarı`,
+  moveDown: (name) => `${name}: aşağı`,
+  randomOrder: 'Rastgele',
+  save: 'Kaydet',
+  cancel: 'Vazgeç',
+  // Player options
+  optionsFor: (name) => `${name} için seçenekler`,
+  rename: 'İsmini değiştir',
+  newName: 'Yeni ad',
+  handOver: 'Masa sahipliğini devret',
+  handOverConfirm: (name) => `Masa sahipliği ${name} adlı oyuncuya geçsin mi?`,
+  handOverYes: 'Evet, devret',
+  kick: 'Masadan çıkar',
+  kickConfirm: (name) => `${name} adlı oyuncu masadan çıkarılsın mı?`,
+  kickYes: 'Evet, çıkar',
+  // Starting a match
+  startMatch: 'Maçı başlat',
+  startNote: 'Bağlantısı olmayanlar da maça dahil olur. En az 3 oyuncu gerekir.',
+  startTooFew: 'Maçı başlatmak için en az 3 oyuncu gerekir.',
+  absentTitle: 'Bağlantısı olmayanlar var',
+  absentText: 'Bu oyuncular şu an bağlı değil. Maç başlarsa onlar da oynar.',
+  startAnyway: 'Yine de başlat',
+  starting: 'Başlatılıyor…',
+  // Tablo
+  tablo: 'Tablo',
+  close: 'Kapat',
+  tabMatch: 'Bu maç',
+  tabSession: 'Oturum',
+  matchHeader: (n, rounds, mode) => `Maç ${n} · ${rounds} tur · ${mode}`,
+  noMatchYet: 'Henüz biten bir maç yok. İlk maç bitince burada görünür.',
+  colRank: '#',
+  colPlayer: 'Oyuncu',
+  colRounds: 'Tur',
+  colPoints: 'Puan',
+  colMatches: 'Maç',
+  colWins: 'Kzn.',
+  won: 'Kazandı',
+  draw: 'Berabere bitti',
+  outInRound: (round) => `${round}. turda çıktı`,
+  removedInRound: (round) => `${round}. turda masadan çıkarıldı`,
+  me: 'sen',
+  leftPlayer: 'Ayrılan oyuncu',
+  hpLabel: (hp) => `${hp} can`,
+  winsLabel: 'galibiyet',
+  lineLiveOnOther: 'Başkasına dolu',
+  lineBlankOnOther: 'Başkasına boş',
+  lineBlankOnSelf: 'Kendine boş',
+  lineLiveOnSelf: 'Kendine dolu',
+  lineEliminations: 'Eleme',
+  lineRounds: (count) => `Tur sonu (${count} tur)`,
+  lineWin: 'Kazanma (maç sonunda)',
+  linePredictions: 'Tahmin',
+  lineTotal: 'Toplam',
+  times: (count) => `${count} kez`,
+  matchFootnote: 'Kazanan başta, çıkanlar çıkış sırasına göre (son çıkan önce) dizilir. Satıra dokun, puanın nereden geldiğini gör.',
+  sessionHeader: (matches) => `${matches} maç oynandı · bekleme salonu`,
+  noSessionYet: 'Henüz maç oynanmadı.',
+  sessionFootnote: 'Puanın altındaki küçük sayı, son maçta kazanılan puandır.',
+});

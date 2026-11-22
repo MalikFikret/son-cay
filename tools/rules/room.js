@@ -14,6 +14,7 @@ import { presenceRules } from './presence.js';
 import { resultsRules } from './results.js';
 import { seatsRules } from './seats.js';
 import { secretsRules } from './secrets.js';
+import { seatOrderRules } from './seat-order.js';
 import { settingsRules } from './settings.js';
 
 // No seat other than the writer's own exists. Rules cannot count children, so each of the 15
@@ -44,6 +45,7 @@ export function roomRules() {
     names: namesRules(),
     match: matchRules(),
     results: resultsRules(),
+    seatOrder: seatOrderRules(),
     $other: REFUSE,
   };
 }

@@ -229,6 +229,23 @@
             }
           }
         },
+        "seatOrder": {
+          ".read": "auth != null && root.child('rooms').child($code).child('members').child(auth.uid).exists() && root.child('rooms').child($code).child('seats').child(root.child('rooms').child($code).child('members').child(auth.uid).val()).child('uid').val() === auth.uid",
+          ".write": "auth != null && $code.matches(/^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$/) && root.child('rooms').child($code).child('members').child(auth.uid).val() === root.child('rooms').child($code).child('meta/hostSeat').val() && root.child('rooms').child($code).child('seats').child(root.child('rooms').child($code).child('meta/hostSeat').val()).child('uid').val() === auth.uid && root.child('rooms').child($code).child('meta/status').val() === 'lobby' && newData.parent().child('meta/status').val() === 'lobby'",
+          ".validate": "newData.hasChildren(['seats', 'savedAt'])",
+          "seats": {
+            ".validate": "newData.hasChildren()",
+            "$index": {
+              ".validate": "$index.matches(/^([0-9]|1[0-4])$/) && newData.isString() && newData.val().matches(/^s(0[1-9]|1[0-5])$/) && ($index === '0' || newData.parent().child('0').val() !== newData.val()) && ($index === '1' || newData.parent().child('1').val() !== newData.val()) && ($index === '2' || newData.parent().child('2').val() !== newData.val()) && ($index === '3' || newData.parent().child('3').val() !== newData.val()) && ($index === '4' || newData.parent().child('4').val() !== newData.val()) && ($index === '5' || newData.parent().child('5').val() !== newData.val()) && ($index === '6' || newData.parent().child('6').val() !== newData.val()) && ($index === '7' || newData.parent().child('7').val() !== newData.val()) && ($index === '8' || newData.parent().child('8').val() !== newData.val()) && ($index === '9' || newData.parent().child('9').val() !== newData.val()) && ($index === '10' || newData.parent().child('10').val() !== newData.val()) && ($index === '11' || newData.parent().child('11').val() !== newData.val()) && ($index === '12' || newData.parent().child('12').val() !== newData.val()) && ($index === '13' || newData.parent().child('13').val() !== newData.val()) && ($index === '14' || newData.parent().child('14').val() !== newData.val())"
+            }
+          },
+          "savedAt": {
+            ".validate": "newData.val() === now"
+          },
+          "$other": {
+            ".validate": false
+          }
+        },
         "$other": {
           ".validate": false
         }

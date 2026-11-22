@@ -136,6 +136,37 @@ export function createTrafficCounter() {
 }
 
 /**
+ * The readable match results in match order: { n, score (scoreMatch output), joinedAt }.
+ * Unreadable entries are skipped.
+ * @param {unknown} results rooms/{CODE}/results (an object, or an array when the keys are 1..n)
+ * @returns {Array<{ n: number, score: object, joinedAt: Record<string, number> }>}
+ */
+export function parseResults(results) {
+  const entries = [];
+  if (results === null || typeof results !== 'object') return entries;
+  for (const [key, entry] of Object.entries(results)) {
+    const n = Number(key);
+    if (!Number.isInteger(n) || entry === null || typeof entry !== 'object' || typeof entry.scoreJson !== 'string') continue;
+    let score;
+    try {
+      score = JSON.parse(entry.scoreJson);
+    } catch {
+      continue;
+    }
+    if (score === null || typeof score !== 'object' || score.players === null || typeof score.players !== 'object') continue;
+    const joinedAt = entry.joinedAt !== null && typeof entry.joinedAt === 'object' ? entry.joinedAt : {};
+    entries.push({ n, score, joinedAt });
+  }
+  return entries.sort((a, b) => a.n - b.n);
+}
+
+/** True if the result's recorded joinedAt of `seatId` is the seat's current one (same person). */
+function samePerson(joinedAt, seats, seatId) {
+  const seat = seats?.[seatId];
+  return seat !== null && typeof seat === 'object' && typeof seat.joinedAt === 'number' && joinedAt[seatId] === seat.joinedAt;
+}
+
+/**
  * Session points per seat, summed over the room's match results with the engine's session
  * helpers. Points belong to the person, not the seat: a result counts for a seat only if the
  * joinedAt recorded in that result equals the seat's current joinedAt. A newcomer on a freed
@@ -147,22 +178,7 @@ export function createTrafficCounter() {
  */
 export function computeSessionScores(results, seats) {
   const current = seats !== null && typeof seats === 'object' ? seats : {};
-  const entries = [];
-  if (results !== null && typeof results === 'object') {
-    for (const [key, entry] of Object.entries(results)) {
-      const n = Number(key);
-      if (!Number.isInteger(n) || entry === null || typeof entry !== 'object' || typeof entry.scoreJson !== 'string') continue;
-      let score;
-      try {
-        score = JSON.parse(entry.scoreJson);
-      } catch {
-        continue;
-      }
-      if (score === null || typeof score !== 'object' || score.players === null || typeof score.players !== 'object') continue;
-      entries.push({ n, score, joinedAt: entry.joinedAt ?? {} });
-    }
-  }
-  entries.sort((a, b) => a.n - b.n);
+  const entries = parseResults(results);
 
   let session = createSession();
   for (const { score, joinedAt } of entries) {
@@ -197,4 +213,86 @@ export function buildResult(state, log, seats) {
     if (seat && typeof seat.joinedAt === 'number') joinedAt[p.id] = seat.joinedAt;
   }
   return { scoreJson: JSON.stringify(score), joinedAt };
+}
+
+/**
+ * The session table of the waiting room's Tablo ("Oturum"): one row per current seat, ranked by
+ * session points (ties: more wins, then seat id). As computeSessionScores, a result counts for a
+ * seat only if it was the same person (same joinedAt).
+ * @param {unknown} results rooms/{CODE}/results
+ * @param {Record<string, { joinedAt?: number }> | null} seats rooms/{CODE}/seats (current)
+ * @returns {{ matches: number, rows: Array<{ seatId: string, points: number, matches: number,
+ *   wins: number, last: number | null }> }}  matches: results in the room; row.matches: matches
+ *   this person played; last: what the room's latest match added (null if they did not play it)
+ */
+export function computeSessionTable(results, seats) {
+  const current = seats !== null && typeof seats === 'object' ? seats : {};
+  const entries = parseResults(results);
+  const latest = entries.at(-1) ?? null;
+  const rows = Object.keys(current)
+    .filter((seatId) => isSeatId(seatId) && current[seatId] !== null && typeof current[seatId] === 'object')
+    .map((seatId) => {
+      let points = 0;
+      let matches = 0;
+      let wins = 0;
+      for (const { score, joinedAt } of entries) {
+        const row = score.players[seatId];
+        if (!row || !samePerson(joinedAt, current, seatId)) continue;
+        matches += 1;
+        points += Number.isFinite(row.total) ? row.total : 0;
+        if (score.result === 'win' && score.winner === seatId) wins += 1;
+      }
+      const lastRow = latest?.score.players[seatId];
+      const last = lastRow && samePerson(latest.joinedAt, current, seatId) && Number.isFinite(lastRow.total) ? lastRow.total : null;
+      return { seatId, points, matches, wins, last };
+    })
+    .sort((a, b) => b.points - a.points || b.wins - a.wins || (a.seatId < b.seatId ? -1 : 1));
+  return { matches: entries.length, rows };
+}
+
+/**
+ * The host's saved seating order, or null (random order). Accepts what the database returns
+ * (seats as an array, or an object keyed by index when there are gaps).
+ * @param {unknown} raw rooms/{CODE}/seatOrder
+ * @returns {{ seats: string[], savedAt: number } | null}
+ */
+export function normalizeSeatOrder(raw) {
+  if (raw === null || typeof raw !== 'object' || typeof raw.savedAt !== 'number') return null;
+  const list = raw.seats;
+  if (list === null || typeof list !== 'object') return null;
+  const ordered = Array.isArray(list)
+    ? list
+    : Object.keys(list)
+      .filter((key) => /^([0-9]|1[0-4])$/.test(key))
+      .sort((a, b) => Number(a) - Number(b))
+      .map((key) => list[key]);
+  const seen = new Set();
+  const seatIds = [];
+  for (const seatId of ordered) {
+    if (!isSeatId(seatId) || seen.has(seatId)) continue;
+    seen.add(seatId);
+    seatIds.push(seatId);
+  }
+  return seatIds.length === 0 ? null : { seats: seatIds, savedAt: raw.savedAt };
+}
+
+/**
+ * The seated seats in playing order. With a saved order: the listed seats that are still taken
+ * by someone who sat down before it was saved, in its order, then every other seated seat
+ * (newcomers, seats missing from the list) in seat-id order. Without one: seat-id order.
+ * @param {Record<string, { joinedAt?: number }> | null} seats rooms/{CODE}/seats
+ * @param {unknown} seatOrder rooms/{CODE}/seatOrder (raw or normalized)
+ * @returns {{ seatIds: string[], manual: boolean }}  manual: a saved order exists
+ */
+export function orderSeats(seats, seatOrder) {
+  const seated = buildPlayers(seats).map((p) => p.id);
+  const order = normalizeSeatOrder(seatOrder);
+  if (order === null) return { seatIds: seated, manual: false };
+  const placed = order.seats.filter((seatId) => {
+    if (!seated.includes(seatId)) return false;
+    const joinedAt = seats[seatId].joinedAt;
+    return typeof joinedAt !== 'number' || joinedAt <= order.savedAt;
+  });
+  const rest = seated.filter((seatId) => !placed.includes(seatId));
+  return { seatIds: [...placed, ...rest], manual: true };
 }

@@ -22,6 +22,8 @@
 //
 //   match:    { n, seq, stateJson, log: { [seq]: eventsJson }, clockAt }   members read; see match-helpers.js
 //   results/{n}: { scoreJson, joinedAt: { [seatId]: number } }   write-once result of match n, members read
+//   seatOrder: { seats: [seatId, ...], savedAt: <server time> }   the host's manual seating order
+//              (absent = random); written only by the current host between matches, members read
 //
 // Seat ids are exactly s01..s15. The fixed set enforces the player limit, because security
 // rules cannot count children. Later steps add more children of rooms/{CODE} (waiting
@@ -128,6 +130,7 @@ export const paths = Object.freeze({
   match: (code) => `rooms/${code}/match`,
   matchN: (code) => `rooms/${code}/match/n`,
   results: (code) => `rooms/${code}/results`,
+  seatOrder: (code) => `rooms/${code}/seatOrder`,
   result: (code, n) => `rooms/${code}/results/${n}`,
   presence: (code) => `rooms/${code}/presence`,
   presenceSeat: (code, seatId) => `rooms/${code}/presence/${seatId}`,

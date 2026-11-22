@@ -2,8 +2,8 @@
 // its counter, and the player rows. Limits come from the engine (CONFIG_LIMITS, defaultConfig,
 // validateConfig, toolsForMode), never from copies. Tool names and icons live in tools.js.
 
-import { CONFIG_LIMITS, TOOL_IDS, defaultConfig, toolsForMode, validateConfig } from '../engine/index.js';
-import { isSeatPresent } from '../rooms/index.js';
+import { CONFIG_LIMITS, MIN_PLAYERS, TOOL_IDS, defaultConfig, toolsForMode, validateConfig } from '../engine/index.js';
+import { isSeatPresent, orderSeats } from '../rooms/index.js';
 import { toolName } from './tools.js';
 
 /** The general settings with − / + buttons, in the order of the design. */
@@ -105,14 +105,14 @@ export function formatPoints(points) {
 }
 
 /**
- * The rows of the player list, in seat order, with their labels:
- * "sen", "masa sahibi", "bağlantı yok", "sonraki maçta oynar" (a waiting seat).
- * @param {{ seats: object, presence: object, scores: object, hostSeat: string, mySeat: string }} lobby
+ * The rows of the player list, in playing order (the host's saved seat order, else seat order),
+ * with their labels: "sen", "masa sahibi", "bağlantı yok", "sonraki maçta oynar" (a waiting seat).
+ * @param {{ seats: object, presence: object, scores: object, hostSeat: string, mySeat: string,
+ *   seatOrder?: object | null }} lobby
  */
-export function playerRows({ seats, presence, scores, hostSeat, mySeat }) {
-  return Object.keys(seats ?? {})
-    .filter((seatId) => /^s(0[1-9]|1[0-5])$/.test(seatId) && seats[seatId] && typeof seats[seatId].name === 'string')
-    .sort()
+export function playerRows({ seats, presence, scores, hostSeat, mySeat, seatOrder = null }) {
+  return orderSeats(seats ?? {}, seatOrder).seatIds
+    .filter((seatId) => typeof seats[seatId].name === 'string')
     .map((seatId) => {
       const seat = seats[seatId];
       const me = seatId === mySeat;
@@ -135,4 +135,37 @@ export function playerRows({ seats, presence, scores, hostSeat, mySeat }) {
         tagLine: tags.join(' · '),
       };
     });
+}
+
+/**
+ * Moves one entry of the seat order up (delta -1) or down (+1). Returns a new array (the same
+ * one if the move would leave the list).
+ */
+export function moveSeat(order, index, delta) {
+  const to = index + Math.sign(delta);
+  if (!Number.isInteger(index) || index < 0 || index >= order.length || to < 0 || to >= order.length) return order;
+  const next = [...order];
+  [next[index], next[to]] = [next[to], next[index]];
+  return next;
+}
+
+/**
+ * The options of a player's "⋯" menu, for the viewer: the host may rename anyone, hand the host
+ * role to another seat and remove another seat; a player may only rename themself. Only in the
+ * lobby. Returns [] when there is nothing to offer (then no "⋯" button is shown).
+ * @param {{ seatId: string }} row
+ * @param {{ mySeat: string, hostSeat: string, inLobby: boolean }} viewer
+ * @returns {Array<'rename' | 'handOver' | 'kick'>}
+ */
+export function playerOptions(row, { mySeat, hostSeat, inLobby }) {
+  if (!inLobby) return [];
+  const iAmHost = mySeat === hostSeat;
+  const own = row.seatId === mySeat;
+  if (iAmHost) return own ? ['rename'] : ['rename', 'handOver', 'kick'];
+  return own ? ['rename'] : [];
+}
+
+/** Can the host start, and who is absent (shown before starting). */
+export function startCheck(rows) {
+  return { canStart: rows.length >= MIN_PLAYERS, absent: rows.filter((row) => !row.present) };
 }

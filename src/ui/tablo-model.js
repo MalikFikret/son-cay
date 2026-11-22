@@ -1,0 +1,96 @@
+// Pure helpers of the Tablo panel (no DOM): what each row and each breakdown line says. The data
+// comes from the room layer (getLastMatch / summarizeMatch for "Bu maç", the session table of
+// watchLobby for "Oturum"); this file only turns it into display values.
+
+import { SHOT_KINDS } from '../rooms/index.js';
+import { MODE_LABELS } from './lobby-model.js';
+import { TEXT } from './messages.js';
+
+const MINUS = '−';
+
+/** "+2", "−1" (a real minus sign) or "0". */
+export function formatSigned(points) {
+  const n = Number.isFinite(points) ? points : 0;
+  if (n > 0) return `+${n}`;
+  if (n < 0) return `${MINUS}${-n}`;
+  return '0';
+}
+
+const SHOT_LABELS = Object.freeze({
+  liveOnOther: TEXT.lineLiveOnOther,
+  blankOnOther: TEXT.lineBlankOnOther,
+  blankOnSelf: TEXT.lineBlankOnSelf,
+  liveOnSelf: TEXT.lineLiveOnSelf,
+});
+
+/** The status line under a name: "Kazandı", "N. turda çıktı", ... */
+export function statusText(row, result) {
+  if (row.status === 'won') return TEXT.won;
+  if (row.status === 'eliminated') return TEXT.outInRound(row.outRound);
+  if (row.status === 'removed') return TEXT.removedInRound(row.outRound);
+  return result === 'draw' ? TEXT.draw : '';
+}
+
+/**
+ * The lines of a row's points breakdown, in the order of the design:
+ * [{ label, count, points }], the total last. `count` is "N kez", "—" or "".
+ * @param {object} row a summarizeMatch row
+ * @param {string} mode 'classic' | 'custom'
+ */
+export function breakdownLines(row, mode) {
+  const b = row.breakdown;
+  const times = (count) => (count > 0 ? TEXT.times(count) : '—');
+  const lines = SHOT_KINDS.map((kind) => ({ label: SHOT_LABELS[kind], count: times(b[kind].count), points: formatSigned(b[kind].points) }));
+  lines.push({ label: TEXT.lineEliminations, count: times(b.eliminations.count), points: formatSigned(b.eliminations.points) });
+  lines.push({ label: TEXT.lineRounds(b.rounds.count), count: '', points: formatSigned(b.rounds.points) });
+  lines.push({ label: TEXT.lineWin, count: '—', points: b.win.points === 0 ? '—' : formatSigned(b.win.points) });
+  if (mode === 'custom' || b.predictions.count > 0) {
+    lines.push({ label: TEXT.linePredictions, count: times(b.predictions.count), points: formatSigned(b.predictions.points) });
+  }
+  lines.push({ label: TEXT.lineTotal, count: '', points: String(row.points), total: true });
+  return lines;
+}
+
+/**
+ * The "Bu maç" view of a summary: header and rows with rank, name, status and tea glasses.
+ * @param {object | null} summary getLastMatch result
+ * @param {string} mySeat
+ */
+export function matchView(summary, mySeat) {
+  if (!summary) return null;
+  return {
+    header: TEXT.matchHeader(summary.n, summary.rounds, MODE_LABELS[summary.mode] ?? ''),
+    rows: summary.rows.map((row, i) => ({
+      ...row,
+      rank: i + 1,
+      displayName: row.name ?? TEXT.leftPlayer,
+      me: row.seatId === mySeat && row.name !== null,
+      out: row.status === 'eliminated' || row.status === 'removed',
+      statusText: statusText(row, summary.result),
+      // Tea glasses (life) only for the players still in at the end.
+      glasses: row.status === 'won' || row.status === 'alive'
+        ? { full: Math.max(0, row.hp), total: Math.max(summary.startHp, row.hp) }
+        : null,
+      lines: breakdownLines(row, summary.mode),
+    })),
+  };
+}
+
+/**
+ * The "Oturum" view of the session table: header and ranked rows with names.
+ * @param {{ matches: number, rows: Array<{ seatId, points, matches, wins, last }> }} session
+ * @param {Record<string, string>} names seat id -> current name
+ * @param {string} mySeat
+ */
+export function sessionView(session, names, mySeat) {
+  return {
+    header: session.matches > 0 ? TEXT.sessionHeader(session.matches) : TEXT.noSessionYet,
+    rows: session.rows.map((row, i) => ({
+      ...row,
+      rank: i + 1,
+      displayName: names[row.seatId] ?? '',
+      me: row.seatId === mySeat,
+      lastText: row.last === null ? '' : formatSigned(row.last),
+    })),
+  };
+}

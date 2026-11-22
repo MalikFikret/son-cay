@@ -24,7 +24,15 @@ import { MAX_PLAYERS, MIN_PLAYERS, applyAction, createMatch, eventsFor, validate
 import { createClockRunner } from './clock.js';
 import { ROOM_ERR, RoomError, isPermissionDenied } from './errors.js';
 import { isSeatPresent } from './host.js';
-import { buildPlayers, buildResult, computeSessionScores, eventsSince, legalActionsFor, parseLog, playerIdIn } from './match-helpers.js';
+import {
+  buildResult,
+  computeSessionScores,
+  eventsSince,
+  legalActionsFor,
+  orderSeats,
+  parseLog,
+  playerIdIn,
+} from './match-helpers.js';
 import { LOBBY_STATUS, PLAYING_STATUS, paths } from './schema.js';
 
 // Only removeAbsentPlayer (host, absent seat) may send this one; submitAction refuses it.
@@ -87,8 +95,9 @@ export function createMatchFunctions(ctx) {
 
   /**
    * The host starts a match between matches. The players are all seated seats (present or
-   * absent, waiting ones included: decision Q37), sorted by seat id; the settings are checked with
-   * the engine's validateConfig. One update sets meta.status to 'playing', writes
+   * absent, waiting ones included: decision Q37): in the host's saved order (seatOrder, then
+   * randomizeSeats is off for this match), else sorted by seat id and shuffled by the engine
+   * (if the settings say so). The settings are checked with the engine's validateConfig. One update sets meta.status to 'playing', writes
    * match = { n, seq: 0, stateJson, log: { 0 }, clockAt } and clears every waiting flag.
    * @param {{ uid: string, code: string }} input
    * @returns {Promise<{ n: number, players: string[] }>}
@@ -105,7 +114,9 @@ export function createMatchFunctions(ctx) {
     if (meta.hostSeat !== mySeat) throw new RoomError(ROOM_ERR.WRITE_DENIED, 'only the host can start a match');
 
     const seats = await read(paths.seats(roomCode));
-    const players = buildPlayers(seats);
+    // A saved manual order (seatOrder) decides the seating; without one the engine shuffles.
+    const { seatIds, manual } = orderSeats(seats, await read(paths.seatOrder(roomCode)));
+    const players = seatIds.map((id) => ({ id }));
     if (players.length < MIN_PLAYERS || players.length > MAX_PLAYERS) {
       throw new RoomError(ROOM_ERR.NOT_ENOUGH_PLAYERS, `a match needs ${MIN_PLAYERS} to ${MAX_PLAYERS} seated players`);
     }
@@ -115,7 +126,8 @@ export function createMatchFunctions(ctx) {
       error.details = checked.errors;
       throw error;
     }
-    const created = createMatch(checked.config, players, randomSeed());
+    const config = manual ? { ...checked.config, randomizeSeats: false } : checked.config;
+    const created = createMatch(config, players, randomSeed());
     if (!created.ok) {
       const error = new RoomError(ROOM_ERR.INVALID_SETTINGS, `the engine refused to start: ${created.error.code}`);
       error.details = [created.error];

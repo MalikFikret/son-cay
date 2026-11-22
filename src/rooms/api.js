@@ -22,6 +22,7 @@ import { createLeaveFunction } from './leave.js';
 import { createManageFunctions } from './manage.js';
 import { createSettingsFunctions } from './settings.js';
 import { createLobbyFunctions } from './lobby.js';
+import { createSeatOrderFunctions } from './seat-order.js';
 import { createMatchFunctions } from './match.js';
 import { createTrafficCounter } from './match-helpers.js';
 import {
@@ -65,7 +66,7 @@ const DEFAULT_MAX_CODE_ATTEMPTS = 10;
 
 /**
  * Creates the room API bound to one database instance. The original five deps are enough for
- * createRoom, joinRoom, listSeatNames, getRoomSummary, getMySeat, recoverSeat, leaveRoom, renameSeat, kickSeat and updateSettings; presence and host functions also need
+ * createRoom, joinRoom, listSeatNames, getRoomSummary, getMySeat, recoverSeat, leaveRoom, renameSeat, kickSeat, updateSettings, setSeatOrder, clearSeatOrder and getLastMatch; presence and host functions also need
  * onValue (and onDisconnect for startPresence) and throw INVALID_DEPENDENCIES without them.
  * @param {RoomApiDeps} deps
  */
@@ -434,7 +435,8 @@ export function createRoomApi(deps) {
   });
 
   const { updateSettings } = createSettingsFunctions({ read, writeAll, requireUid, requireCode, currentSeat });
-  const { watchLobby } = createLobbyFunctions({ deps, db, ref, requireUid, requireCode });
+  const { watchLobby, getLastMatch } = createLobbyFunctions({ deps, db, ref, read, requireUid, requireCode, currentSeat });
+  const { setSeatOrder, clearSeatOrder } = createSeatOrderFunctions({ read, writeAll, serverTimestamp, requireUid, requireCode, currentSeat });
 
   const traffic = createTrafficCounter();
   const matchFunctions = createMatchFunctions({
@@ -474,6 +476,9 @@ export function createRoomApi(deps) {
     kickSeat,
     updateSettings,
     watchLobby,
+    getLastMatch,
+    setSeatOrder,
+    clearSeatOrder,
     ...matchFunctions,
   };
 }
