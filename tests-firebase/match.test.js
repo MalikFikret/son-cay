@@ -158,16 +158,18 @@ describe('submitAction', () => {
     const other = initial.players.find((p) => p.id !== turn).id;
     const targets = listLegalActions(initial, turn).filter((a) => a.type === 'chooseTarget');
     assert.ok(targets.length >= 2);
-    // Two devices of the turn player pick different targets (re-choosing the target while it is
-    // not confirmed yet is legal, so both may be accepted), and another player acts too.
+    // Two devices of the turn player shoot at different targets (without the confirmation step
+    // each one fires; the second is accepted only if the first left the turn with that player),
+    // and another player sends a move that is never legal for them (a confirm without an aim: the
+    // turn may reach them after the first shot, so a shot of theirs could be legal).
     const submissions = [
       { uid: UID[turn], action: targets[0] },
       { uid: UID[turn], action: targets[1] },
-      { uid: UID[other], action: { type: 'chooseTarget', target: turn } },
+      { uid: UID[other], action: { type: 'confirmShot' } },
     ];
     const results = await Promise.all(submissions.map((s) => live(s.uid).submitAction({ uid: s.uid, code: CODE, action: s.action })));
     assert.equal(results[2].ok, false);
-    assert.equal(results[2].error.code, 'NOT_YOUR_TURN');
+    assert.ok(['NOT_YOUR_TURN', 'WRONG_PHASE'].includes(results[2].error.code), results[2].error.code);
     const accepted = results.map((r, i) => (r.ok ? submissions[i].action : null)).filter(Boolean);
     assert.ok(accepted.length >= 1, JSON.stringify(results));
 
@@ -193,8 +195,12 @@ describe('submitAction', () => {
     await startedRoom();
     let state = await stateOf();
     const turn = state.turn.playerId;
-    // Bring the turn player to the confirm step, then confirm from two devices at once: after the
-    // first confirmation the shot is fired, so the second one is refused by the engine.
+    // The confirmation step is off by default (decision 55): switch it on for the turn player,
+    // aim, then confirm from two devices at once: after the first confirmation the shot is
+    // fired, so the second one is refused by the engine.
+    const on = { type: 'setPreference', confirmShot: true };
+    assert.equal((await live(UID[turn]).submitAction({ uid: UID[turn], code: CODE, action: on })).ok, true);
+    state = await stateOf();
     const target = listLegalActions(state, turn).find((a) => a.type === 'chooseTarget');
     assert.equal((await live(UID[turn]).submitAction({ uid: UID[turn], code: CODE, action: target })).ok, true);
     state = await stateOf();
@@ -203,7 +209,7 @@ describe('submitAction', () => {
     const results = await Promise.all([1, 2].map(() => live(UID[turn]).submitAction({ uid: UID[turn], code: CODE, action: confirm })));
     assert.deepEqual(results.map((r) => r.ok).sort(), [false, true], JSON.stringify(results));
     const match = await matchOf();
-    assert.equal(match.seq, 2);
+    assert.equal(match.seq, 3);
     assert.equal(match.stateJson, JSON.stringify(applyAction(state, confirm).state));
   });
 

@@ -94,3 +94,27 @@ export function sessionView(session, names, mySeat) {
     })),
   };
 }
+
+/**
+ * The live "Bu maç" view during a match (decision 47), from summarizeView of this device's view
+ * and events: header with the tur, the players still in and the mode; living players on top
+ * ("oyunda", "bağlantı yok" when absent), then the latest to go out. After the end it is the
+ * same as the finished-match view (winner first). Only public information.
+ * @param {object} summary summarizeView result
+ * @param {{ mySeat: string, names: Record<string, string>, present: (seatId) => boolean,
+ *   round: number, ended: boolean }} info
+ */
+export function liveMatchView(summary, { mySeat, names, present, round, ended }) {
+  if (!summary) return null;
+  const named = { ...summary, rows: summary.rows.map((row) => ({ ...row, name: names[row.seatId] ?? null })) };
+  const view = matchView(named, mySeat);
+  if (ended) return view;
+  const alive = summary.rows.filter((row) => row.status === 'alive').length;
+  return {
+    header: TEXT.liveHeader(round, alive, summary.rows.length, MODE_LABELS[summary.mode] ?? ''),
+    footnote: TEXT.liveFootnote,
+    rows: view.rows.map((row) => (row.status === 'alive'
+      ? { ...row, statusText: present(row.seatId) ? TEXT.inGame : `${TEXT.tagAbsent} · ${TEXT.inGame}` }
+      : row)),
+  };
+}

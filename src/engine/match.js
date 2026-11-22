@@ -23,6 +23,8 @@ function failure(code, message, extra) {
 }
 
 // players: [{ id: string, confirmShot?: boolean }, ...] (3 to 15, unique ids)
+//          confirmShot: the player's confirmation step, OFF unless true (decision 55:
+//          the game has no confirmation step; the option stays in the engine).
 // seed:    integer or non-empty string
 // Returns { ok: true, state, events } or { ok: false, error }.
 export function createMatch(config, players, seed) {
@@ -73,7 +75,7 @@ export function createMatch(config, players, seed) {
   };
   const ctx = { state, events: [] };
 
-  const order = players.map((p) => ({ id: p.id, confirmShot: p.confirmShot !== false }));
+  const order = players.map((p) => ({ id: p.id, confirmShot: p.confirmShot === true }));
   if (cfg.randomizeSeats) shuffleInPlace(state, order);
   state.players = order.map((p, seat) => ({
     id: p.id,
@@ -110,8 +112,8 @@ function requireCurrentPlayer(state, action) {
   return player;
 }
 
-// Pick a target. With confirmation on (the default) this only aims; with the
-// player's confirmation turned off it fires at once. The aim itself is known
+// Pick a target. With the player's confirmation off (the default) this fires
+// at once; with it switched on it only aims and confirmShot fires. The aim itself is known
 // to the shooter only: nobody gets a chance to react between aim and shot.
 function handleChooseTarget(ctx, action) {
   const s = ctx.state;

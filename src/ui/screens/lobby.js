@@ -9,7 +9,8 @@
 // players through the "⋯" options; a player renames themself there. Tablo shows the last match
 // and the session. While a match runs, the match table (screens/table.js) replaces the waiting
 // room; presence and the host watcher keep running underneath. When the match ends, the table
-// stays a moment on its final state, then the waiting room returns.
+// shows its end screen until the player presses "Salona dön"; if the host starts the next match
+// while a player is still on it, that player goes straight to the new table.
 
 import { h } from '../dom.js';
 import { copyText, errorLine, icon, screen } from '../components.js';
@@ -110,9 +111,9 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
   const lobbyPart = h('div', { class: 'lobby-part' }, topBar, loadingLine, body, bottom);
   const root = screen('screen-lobby', lobbyPart, confirmDialog.el);
 
-  // The match table, while a match runs (and a moment after it ended).
+  // The match table, while a match runs and on its end screen afterwards.
   let table = null;
-  let tableClosing = false;
+  let tableSawLobby = false; // the room went back to "lobby" while this table was shown
 
   // Bottom sheets and the Tablo (each destroyed when the screen is left).
   const sheetCtx = { api: ctx.api, uid: ctx.uid, code };
@@ -202,19 +203,18 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
     tabloButton.disabled = playing;
     if (playing) tablo.close();
     leaveButton.title = playing ? 'Maç sırasında masadan çıkılamaz' : '';
+    // A new match started while this player was still on the last one's end screen.
+    if (playing && table && tableSawLobby) closeTable();
     if (playing && !table) openTable(next);
     if (table) {
-      table.setRoom({ names: Object.fromEntries(rows.map((row) => [row.seatId, row.name])), presence: next.presence });
-      if (!playing && !tableClosing) {
-        // The match ended: let the table show its last shot and result, then the waiting room.
-        tableClosing = true;
-        const closing = table;
-        closing.finish().then(() => {
-          if (ended || table !== closing) return;
-          closeTable();
-          if (lobby) render(lobby);
-        });
-      }
+      if (!playing) tableSawLobby = true;
+      table.setRoom({
+        names: Object.fromEntries(rows.map((row) => [row.seatId, row.name])),
+        presence: next.presence,
+        hostSeat: next.meta.hostSeat,
+        session: next.session,
+        status: next.meta.status,
+      });
       return;
     }
     renderPlayers(rows);
@@ -442,8 +442,9 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
       mySeat,
       watchServerOffset: ctx.watchServerOffset,
       onLost: onLiveError,
+      onBack: backToLobby,
     });
-    tableClosing = false;
+    tableSawLobby = false;
     lobbyPart.hidden = true;
     root.append(table.el);
     document.title = 'Son Çay: masa';
@@ -455,9 +456,17 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
     table.destroy();
     table.el.remove();
     table = null;
-    tableClosing = false;
+    tableSawLobby = false;
     lobbyPart.hidden = false;
     if (view.active()) document.title = 'Son Çay: bekleme salonu';
+  }
+
+  // "Salona dön" on the end screen (enabled once the room is back in the lobby).
+  function backToLobby() {
+    if (ended || !table || lobby?.meta.status !== 'lobby') return;
+    closeTable();
+    render(lobby);
+    window.scrollTo(0, 0);
   }
 
   // --- Invite link -----------------------------------------------------------------------------

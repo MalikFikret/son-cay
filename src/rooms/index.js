@@ -17,7 +17,7 @@ export {
   parseLog,
   playerIdIn,
 } from './match-helpers.js';
-export { SHOT_KINDS, orderBySurvival, summarizeMatch } from './match-summary.js';
+export { SHOT_KINDS, orderBySurvival, summarizeMatch, summarizeView } from './match-summary.js';
 export { BACKUP_DELAY_MS, BACKUP_JITTER_MS, createClockRunner, planTimeout } from './clock.js';
 export { CODE_ALPHABET, CODE_LENGTH, generateRoomCode, isValidRoomCode, normalizeRoomCode } from './code.js';
 export { ROOM_ERR, RoomError, isPermissionDenied } from './errors.js';

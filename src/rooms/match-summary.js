@@ -30,9 +30,19 @@ function emptyBreakdown() {
  *   rows: living players first (points, then seat id), then the others, last out first
  */
 export function summarizeMatch({ n, state, log, scoring = DEFAULT_SCORING }) {
-  const events = publicEvents(parseLog(log).flatMap((entry) => entry.events));
+  return summarizeView({ n, view: viewFor(state, null), events: parseLog(log).flatMap((entry) => entry.events), scoring });
+}
+
+/**
+ * The same summary from what one device sees: any viewFor() view of the match (only its public
+ * part is read: config and players) and the events that device received (only the PUBLIC ones
+ * are read). Works for a running match too (the live Tablo): living players are 'alive', points
+ * are the ones earned so far, `complete` is false and `result` null until the match ended.
+ * @param {{ n: number, view: object, events: object[], scoring?: object }} input
+ */
+export function summarizeView({ n, view, events: seen, scoring = DEFAULT_SCORING }) {
+  const events = publicEvents(Array.isArray(seen) ? seen : []);
   const score = scoreMatch(events, scoring);
-  const view = viewFor(state, null);
 
   const rows = new Map();
   for (const player of view.players) {
@@ -112,12 +122,12 @@ export function summarizeMatch({ n, state, log, scoring = DEFAULT_SCORING }) {
 
   return {
     n,
-    mode: state.config.mode,
+    mode: view.config.mode,
     rounds: round,
     complete: score.complete,
     result: score.result,
     winner: score.winner,
-    startHp: state.config.hp,
+    startHp: view.config.hp,
     rows: ordered.map(({ outIndex, outOrder, ...row }) => row),
   };
 }

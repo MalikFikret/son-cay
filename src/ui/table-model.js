@@ -313,3 +313,90 @@ export function directionArrows(cx, cy, r, direction) {
     };
   });
 }
+
+// --- Spectators, kicking -------------------------------------------------------------------------
+
+/**
+ * The strip shown instead of the hand and the fire button, or null for a living player:
+ * "İzliyorsun" for a player who is out, "İzliyorsun · sonraki maçı bekliyorsun" for a seat that
+ * joined while the match runs (not a player of this match: the spectator view).
+ */
+export function watchStrip(view) {
+  if (!view || view.status !== 'active' || view.role === 'alive') return null;
+  return view.role === 'spectator' ? TEXT.watchingWaiting : TEXT.watching;
+}
+
+/**
+ * Whether this device shows the kick button on a seat (decision 6): only the host, only during
+ * the match, only for another living player whose presence is off. The room layer checks the
+ * same again (removeAbsentPlayer); this only decides what is drawn.
+ */
+export function canKick({ view, seatId, mySeat, hostSeat, present }) {
+  if (!view || view.status !== 'active' || hostSeat !== mySeat || seatId === mySeat || present) return false;
+  return view.players.some((p) => p.id === seatId && p.alive);
+}
+
+// --- End of the match ------------------------------------------------------------------------------
+
+/**
+ * The large result and the short lines under it (approved mocks 6, 7, 8 of conversation 13):
+ * "Kazandın" / "Kazanan: X" / "Berabere". Names are never put inside a Turkish word.
+ * @param {object} view the final view
+ * @param {(id: string) => string} nameOf
+ * @param {Record<string, { round: number, removed: boolean }>} outs from outRounds
+ */
+export function endHeadline(view, nameOf, outs = {}) {
+  if (!view || view.status !== 'ended') return null;
+  if (view.result?.type !== 'win') return { title: TEXT.drawResult, line: TEXT.endNobody, sub: TEXT.endDrawLine };
+  const winner = view.result.winner;
+  if (winner === view.viewer) return { title: TEXT.youWon, line: TEXT.endMine, sub: '' };
+  const out = view.viewer ? outs[view.viewer] : null;
+  let line = TEXT.endWatched;
+  if (out) line = out.removed ? TEXT.endYouRemoved(out.round) : TEXT.endYouOut(out.round);
+  return { title: TEXT.winnerIs(nameOf(winner)), line, sub: TEXT.endLastTea(nameOf(winner)) };
+}
+
+/** The players eliminated after the last shot of the match (they share the place in a draw). */
+export function lastShotVictims(events) {
+  const list = (events ?? []).filter((e) => e && e.visibility === 'public');
+  let last = -1;
+  list.forEach((e, i) => {
+    if (e.type === 'shot') last = i;
+  });
+  if (last === -1) return [];
+  return list.slice(last + 1).filter((e) => e.type === 'eliminated').map((e) => e.player);
+}
+
+/**
+ * The short ranking of the end screen: place, name, a status line, the match points and the new
+ * session total (once the result is stored: session.matches >= n).
+ * @param {object} summary summarizeView of the final view and events
+ * @param {{ mySeat: string, nameOf: (id) => string, session: { matches: number,
+ *   rows: Array<{ seatId, points }> } | null, events: object[] }} info
+ */
+export function endRanking(summary, { mySeat, nameOf, session, events }) {
+  if (!summary) return [];
+  const tied = summary.result === 'draw' ? lastShotVictims(events) : [];
+  const stored = session && session.matches >= summary.n;
+  let place = 0;
+  return summary.rows.map((row, i) => {
+    const sharesFirst = tied.includes(row.seatId);
+    if (!(sharesFirst && i > 0 && tied.includes(summary.rows[i - 1].seatId))) place = i + 1;
+    let status;
+    if (row.status === 'won') status = TEXT.wonRounds(summary.rounds);
+    else if (sharesFirst) status = TEXT.drawRounds(summary.rounds);
+    else if (row.status === 'removed') status = TEXT.removedInRound(row.outRound);
+    else if (row.status === 'eliminated') status = TEXT.outInRound(row.outRound);
+    else status = TEXT.inGame;
+    const total = stored ? session.rows.find((r) => r.seatId === row.seatId)?.points : undefined;
+    return {
+      seatId: row.seatId,
+      place,
+      name: nameOf(row.seatId),
+      me: row.seatId === mySeat,
+      status,
+      points: row.points,
+      total: typeof total === 'number' ? TEXT.sessionTotal(total) : '',
+    };
+  });
+}

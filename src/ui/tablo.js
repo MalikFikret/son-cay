@@ -2,8 +2,9 @@
 // - "Bu maç": the last finished match of the table (getLastMatch): rows by survival, tur survived,
 //   match points; a tap on a row opens its points breakdown.
 // - "Oturum": the session ranking (points, matches, wins, what the last match added).
-// Only public information. Reusable: the waiting room opens it now; the table screen will open
-// it during a match (live rows and the "Sıra sende" bar come with that step).
+// Only public information. Reusable: the waiting room opens it between matches; the table
+// screen opens it during a match with a live "Bu maç" (setLive) and, on my turn, a red
+// "Sıra sende" bar at the top that closes the panel back to the table (setTurnBar).
 
 import { h, svg } from './dom.js';
 import { ICONS, icon, loading as loadingLine } from './components.js';
@@ -24,12 +25,22 @@ export function createTablo({ loadLastMatch, mySeat }) {
   let summary; // undefined: not loaded; null: no finished match yet
   let loadedFor = -1; // session.matches when the summary was loaded
   let loading = null;
+  let live = null; // () => live "Bu maç" view (the table screen), or null
   const expanded = new Set();
 
   const tabs = { match: tabButton('match', TEXT.tabMatch), session: tabButton('session', TEXT.tabSession) };
   const tabList = h('div', { class: 'segmented tablo-tabs', role: 'tablist', 'aria-label': TEXT.tablo }, tabs.match, tabs.session);
   const headerLine = h('span', { class: 'hint tablo-header-line' });
   const panel = h('div', { class: 'tablo-panel', role: 'tabpanel' });
+  // The red "Sıra sende" bar (the one red exception: it stands in for the fire button).
+  const turnSeconds = h('span', { class: 'turn-bar-seconds' });
+  const turnBar = h('button', { type: 'button', class: 'turn-bar', hidden: true },
+    h('span', { class: 'turn-bar-title', text: TEXT.yourTurn }),
+    turnSeconds,
+    h('span', { class: 'turn-bar-back', text: TEXT.backToTable }),
+    icon('chevron'));
+  turnBar.addEventListener('click', () => sheet.close());
+  sheet.head.prepend(turnBar);
   sheet.head.append(tabList, headerLine);
   sheet.body.append(panel);
 
@@ -49,7 +60,7 @@ export function createTablo({ loadLastMatch, mySeat }) {
     }
     panel.setAttribute('aria-labelledby', `tablo-tab-${id}`);
     render();
-    if (id === 'match') ensureMatch();
+    if (id === 'match' && !live) ensureMatch();
   }
 
   // Loads the last match once per finished match (session.matches changes when one ends).
@@ -81,6 +92,19 @@ export function createTablo({ loadLastMatch, mySeat }) {
     cells.map((text, i) => h('span', { class: i >= 2 ? 'num' : '', text })));
 
   function renderMatch() {
+    if (live) {
+      const view = live();
+      headerLine.textContent = view?.header ?? '';
+      if (!view) {
+        panel.replaceChildren(loadingLine());
+        return;
+      }
+      panel.replaceChildren(
+        columns(TEXT.colRank, TEXT.colPlayer, TEXT.colRounds, TEXT.colPoints, ''),
+        h('ul', { class: 'tablo-list' }, view.rows.map(matchRow)),
+        h('p', { class: 'hint tablo-note', text: view.footnote ?? TEXT.matchFootnote }));
+      return;
+    }
     if (summary === undefined || loading) {
       headerLine.textContent = '';
       panel.replaceChildren(loadingLine());
@@ -175,9 +199,24 @@ export function createTablo({ loadLastMatch, mySeat }) {
       names = nextNames;
       if (!sheet.isOpen()) return;
       // "Bu maç" changes only when another match has ended; "Oturum" follows every change.
-      if (tab === 'match') ensureMatch();
+      if (tab === 'match' && !live) ensureMatch();
       else render();
     },
+    /** Live "Bu maç": a function returning the current view (liveMatchView), or null. */
+    setLive(fn) {
+      live = typeof fn === 'function' ? fn : null;
+    },
+    /** Redraws the open panel (after a match update). The open row stays open. */
+    refresh() {
+      if (sheet.isOpen()) render();
+    },
+    /** The "Sıra sende" bar: shown with the seconds left, or hidden (null). */
+    setTurnBar(seconds) {
+      const show = typeof seconds === 'number';
+      turnBar.hidden = !show;
+      if (show) turnSeconds.textContent = `· ${seconds}`;
+    },
+    isOpen: () => sheet.isOpen(),
     destroy: () => sheet.destroy(),
   };
 }

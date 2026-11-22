@@ -197,6 +197,37 @@ export const TEXT = Object.freeze({
   slideToCancel: 'Vazgeçmek için dışarı kaydır',
   firing: 'Ateşleniyor…',
   shotRefused: 'Atış kabul edilmedi. Sıra değişmiş olabilir.',
-  watchingWaiting: 'Bu maçı izliyorsun, sonraki maçta oynarsın.',
-  watchingOut: 'Oyundan çıktın. Maçın sonunu izliyorsun.',
+  watching: 'İzliyorsun',
+  watchingWaiting: 'İzliyorsun · sonraki maçı bekliyorsun',
+
+  // Kicking a disconnected player from the running match (host only)
+  kickFromMatch: 'Masadan çıkar',
+  kickFromMatchFor: (name) => `${name}: masadan çıkar`,
+  kickMatchConfirm: (name) => `${name} adlı oyuncu bu maçtan çıkarılsın mı?`,
+  kickMatchNote: 'Bağlantısı yok. Bu maçta ölmüş sayılır, kimse ganimet almaz. Masada kalır, sonraki maçta oynar.',
+
+  // Live Tablo during a match
+  liveHeader: (round, alive, total, mode) => `${round}. tur · ${alive} / ${total} oyunda · ${mode}`,
+  inGame: 'oyunda',
+  liveFootnote: 'Oyundakiler puana göre, çıkanlar çıkış sırasına göre dizilir. Satıra dokun, puanın nereden geldiğini gör.',
+  backToTable: 'Masaya dön',
+
+  // End of the match
+  endTop: (code, mode, n) => `Masa ${code} · ${mode} · ${n}. maç`,
+  matchEnded: 'Maç bitti',
+  endMine: 'Son çay senin.',
+  endLastTea: (name) => `Son çayı ${name} içti.`,
+  endYouOut: (round) => `Sen ${round}. turda çıktın.`,
+  endYouRemoved: (round) => `Sen ${round}. turda maçtan çıkarıldın.`,
+  endWatched: 'Bu maçı izledin.',
+  endNobody: 'Kimse kazanmadı.',
+  endDrawLine: 'Son mermi kalanları birlikte götürdü.',
+  rankingTitle: 'Bu maç',
+  rankingLabel: 'Bu maçın sıralaması',
+  rankingCols: 'puan · oturum toplamı',
+  wonRounds: (rounds) => `kazandı · ${rounds} tur`,
+  drawRounds: (rounds) => `berabere · ${rounds} tur`,
+  sessionTotal: (points) => `toplam ${points}`,
+  backToLobby: 'Salona dön',
+  resultsSaving: 'Sonuçlar kaydediliyor…',
 });

@@ -1622,17 +1622,30 @@ li.tablo-row { min-height: 56px; }
   vector-effect: non-scaling-stroke;
 }
 
-/* Seats */
+/* Seats: the box (div) holds the target button (.seat-main) and the host's kick button. */
 .seat {
   position: absolute;
   z-index: 2;
   transform: translate(-50%, -50%);
   width: 112px;
-  margin: 0;
   padding: 6px 4px 8px;
   border-radius: 12px;
   border: 1px solid var(--line-soft);
   background-color: var(--surface);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, opacity 0.3s ease;
+}
+
+.seat-main {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
   color: var(--text);
   font: inherit;
   display: flex;
@@ -1641,12 +1654,28 @@ li.tablo-row { min-height: 56px; }
   gap: 3px;
   text-align: center;
   cursor: default;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, opacity 0.3s ease;
 }
 
-.seat:disabled { color: var(--text); }
-.seat.is-targetable { cursor: pointer; }
+.seat-main:disabled { color: var(--text); }
+.seat.is-targetable .seat-main { cursor: pointer; }
 .seat.is-targetable:hover { border-color: var(--line-strong); }
+
+/* The host's kick button on a disconnected player's seat (approved mocks 3 and 4). */
+.seat-kick {
+  max-width: 100%;
+  margin: 4px 0 0;
+  padding: 3px 8px;
+  min-height: 26px;
+  white-space: nowrap;
+  border-radius: 999px;
+  border: 1px solid rgba(239, 230, 214, 0.45);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
 
 .seat-tag {
   max-width: 100%;
@@ -1682,7 +1711,9 @@ li.tablo-row { min-height: 56px; }
 
 .table-stage[data-size="medium"] .seat { width: 96px; }
 .table-stage[data-size="medium"] .seat-name { font-size: 16px; }
-.table-stage[data-size="small"] .seat { width: 70px; padding: 4px 3px 6px; gap: 2px; }
+.table-stage[data-size="small"] .seat { width: 70px; padding: 4px 3px 6px; }
+.table-stage[data-size="small"] .seat-main { gap: 2px; }
+.table-stage[data-size="small"] .seat-kick { padding: 2px 6px; min-height: 24px; font-size: 10px; }
 .table-stage[data-size="small"] .seat-name { font-size: 14px; }
 .table-stage[data-size="small"] .seat-tag { font-size: 9px; letter-spacing: 0.03em; }
 .table-stage[data-size="small"] .seat-lives svg { width: 7px; height: 10px; }
@@ -1885,7 +1916,7 @@ li.tablo-row { min-height: 56px; }
   color: var(--muted);
 }
 
-.effect-live { color: #F08A7E; font-weight: 600; }
+.effect-live { color: var(--text); font-weight: 700; }
 .effect-blank { color: #8FDAD3; font-weight: 600; }
 
 .table-ring {
@@ -1897,7 +1928,7 @@ li.tablo-row { min-height: 56px; }
 
 .table-ring svg { display: block; }
 .ring-bar { stroke: #8C826C; transition: stroke-dasharray 0.2s linear; }
-.table-ring.is-mine .ring-bar { stroke: #C0392B; }
+.table-ring.is-mine .ring-bar { stroke: var(--accent); }
 
 .ring-text {
   position: absolute;
@@ -1909,7 +1940,28 @@ li.tablo-row { min-height: 56px; }
   font-size: 16px;
 }
 
-.table-note { margin: 0; }
+/* Instead of the hand and the fire button: a player who is out, or a seat that joined late. */
+.watch-strip {
+  margin: auto 0 0;
+  min-height: 56px;
+  padding: 12px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(63, 181, 172, 0.45);
+  background-color: rgba(63, 181, 172, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.table-view {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
 
 .hand {
   display: flex;
@@ -2034,3 +2086,215 @@ li.tablo-row { min-height: 56px; }
     box-shadow: 0 0 0 4px rgba(217, 68, 58, 0.55);
   }
 }
+
+/* --- Live Tablo: the "Sıra sende" bar (the one red exception, standing in for the fire button) - */
+
+.turn-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  margin: -10px -18px 0;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 22px 22px 0 0;
+  background-color: var(--danger);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.turn-bar-title {
+  font-family: var(--font-display);
+  font-size: 20px;
+  line-height: 1;
+}
+
+.turn-bar-seconds { font-weight: 600; }
+
+.turn-bar-back {
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.turn-bar .chevron path { stroke: var(--text); }
+
+/* --- Maç sonu: the end screen (approved mocks 6, 7, 8 of conversation 13) --------------------- */
+
+.end-screen {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 14px 18px 20px;
+}
+
+.end-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 44px;
+}
+
+.end-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding-top: 6px;
+  text-align: center;
+}
+
+.end-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 52px;
+  line-height: 1;
+  overflow-wrap: anywhere;
+}
+
+.end-line { margin: 0; font-size: 16px; line-height: 1.4; }
+
+.end-sub {
+  margin: 0;
+  max-width: 300px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.end-ranking {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.end-ranking-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.end-kicker {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.end-cols { font-size: 11px; }
+
+.end-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.end-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+}
+
+.end-row.is-me {
+  background-color: rgba(63, 181, 172, 0.12);
+  border-color: var(--accent);
+}
+
+.end-place {
+  width: 22px;
+  flex-shrink: 0;
+  font-family: var(--font-display);
+  font-size: 18px;
+  color: var(--muted);
+}
+
+.end-who {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.end-name-line {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.end-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-display);
+  font-size: 18px;
+  line-height: 1.1;
+}
+
+.end-me {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.end-status { font-size: 11px; color: var(--muted); }
+
+.end-points {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+}
+
+/* No red here: a loss of points is plain ivory. */
+.end-gain { font-weight: 600; font-size: 15px; color: var(--text); }
+.end-gain.is-plus { color: #8FDAD3; }
+.end-total { font-size: 11px; color: var(--muted); }
+
+.end-actions {
+  margin-top: auto;
+  display: flex;
+  gap: 10px;
+}
+
+.btn-end-tablo,
+.btn-back-lobby {
+  min-height: 56px;
+  margin: 0;
+  border-radius: 16px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-end-tablo {
+  flex: 1 1 0;
+  border: 1px solid rgba(239, 230, 214, 0.5);
+  background: transparent;
+  color: var(--text);
+  font-size: 15px;
+}
+
+.btn-back-lobby {
+  flex: 2 1 0;
+  border: 0;
+  background-color: var(--accent);
+  color: var(--bg);
+  font-size: 17px;
+}
+
+.btn-back-lobby:disabled { opacity: 0.5; cursor: default; }
+
+.end-note:empty { display: none; }

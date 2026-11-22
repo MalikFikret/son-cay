@@ -3,7 +3,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ERR, applyAction, viewFor } from '../src/engine/index.js';
+import { ERR, applyAction, createMatch, viewFor } from '../src/engine/index.js';
 import { setup, act, play, fails, shoot, use, pubs, privs, one, player, hpOf, edit } from './helpers.js';
 
 // --- The four rows of the turn table ---------------------------------------
@@ -129,10 +129,16 @@ test('confirmation: confirm/cancel are rejected without an aim or from another p
   fails(aimed, { type: 'cancelTarget', playerId: 'p3' }, ERR.NOT_YOUR_TURN);
 });
 
-test('confirmation: is on by default and is not a host setting', () => {
-  const s0 = setup({ chambers: 'LBB', confirm: true });
-  for (const p of s0.players) assert.equal(p.confirmShot, true);
-  assert.equal('confirmShot' in s0.config, false);
+test('confirmation: is off by default (decision 55) and is not a host setting', () => {
+  const { state } = createMatch({ mode: 'classic', randomizeSeats: false }, [{ id: 'p1' }, { id: 'p2' }, { id: 'p3' }], 1);
+  for (const p of state.players) assert.equal(p.confirmShot, false);
+  assert.equal('confirmShot' in state.config, false);
+  // Without a preference, choosing a target fires at once.
+  const fired = act(state, shoot(state.turn.playerId, state.players.find((p) => p.id !== state.turn.playerId).id));
+  assert.equal(pubs(fired.events, 'shot').length, 1);
+  // A player who asks for it (createMatch option or setPreference) still gets the step.
+  const on = createMatch({ mode: 'classic' }, [{ id: 'p1', confirmShot: true }, { id: 'p2' }, { id: 'p3' }], 1).state;
+  assert.deepEqual(on.players.map((p) => [p.id, p.confirmShot]).sort(), [['p1', true], ['p2', false], ['p3', false]]);
 });
 
 test('confirmation: a player can turn it off for themself; their shot is then immediate', () => {

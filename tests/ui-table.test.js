@@ -371,10 +371,14 @@ describe('a played match through the views (what watchMatch gives each seat)', (
 describe('the table screen source', () => {
   const source = readFileSync(new URL('../src/ui/screens/table.js', import.meta.url), 'utf8');
 
-  test('sends only the shot (chooseTarget) and the no-confirmation preference; never the target alone', () => {
+  test('a shot is ONE chooseTarget: no preference write, no confirm step, never the target alone', () => {
     const sent = [...source.matchAll(/submitAction\(\{[^}]*action: \{ type: '([a-zA-Z]+)'/g)].map((m) => m[1]);
-    assert.deepEqual(sent.sort(), ['chooseTarget', 'setPreference']);
-    assert.doesNotMatch(source, /type: 'confirmShot'/);
+    assert.deepEqual(sent, ['chooseTarget']);
+    assert.doesNotMatch(source, /setPreference|confirmShot|ensureNoConfirm/);
+  });
+
+  test("the kick goes through the room layer's removeAbsentPlayer (host and presence checked there)", () => {
+    assert.match(source, /api\.removeAbsentPlayer\(\{ uid, code, seatId: kickSeat \}\)/);
   });
 
   test('cleans up: intervals, timers and listeners are stopped in destroy()', () => {
