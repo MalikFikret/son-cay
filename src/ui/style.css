@@ -1498,3 +1498,539 @@ li.tablo-row { min-height: 56px; }
 }
 
 .tablo-empty { font-size: 14px; padding: 16px 0; }
+
+/* --- Waiting room / table switch ------------------------------------------------------------ */
+
+.lobby-part {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* --- Masa: the match table (approved mocks "Masa · sıra sende" / "başkasının sırası") --------- */
+
+.table-screen {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.table-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 18px 0;
+}
+
+.table-top-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.table-round {
+  font-family: var(--font-display);
+  font-size: 22px;
+  line-height: 1;
+}
+
+.table-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.table-top-button {
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.table-top-button.is-square { width: 44px; padding: 0; }
+.table-top-button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.table-help {
+  font-family: var(--font-display);
+  font-size: 22px;
+  line-height: 1;
+}
+
+/* The table: a 390-unit wide stage; JS sets its height and --cy (the table centre). */
+.table-stage {
+  --cy: 210px;
+  position: relative;
+  width: 100%;
+  max-width: 390px;
+  height: 420px;
+  margin: 0 auto;
+  flex-shrink: 0;
+}
+
+.table-disc {
+  position: absolute;
+  left: calc(50% - 130px);
+  top: calc(var(--cy) - 130px);
+  width: 260px;
+  height: 260px;
+  border-radius: 50%;
+  background-color: #2B2420;
+  border: 6px double rgba(47, 143, 136, 0.6);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* My turn: the frame glows. */
+.table-disc.is-mine {
+  border-color: #3FB5AC;
+  box-shadow: 0 0 30px rgba(63, 181, 172, 0.5), inset 0 0 18px rgba(63, 181, 172, 0.25);
+}
+
+.table-decor {
+  position: absolute;
+  left: calc(50% - 124px);
+  top: calc(var(--cy) - 124px);
+  pointer-events: none;
+}
+
+.table-arrows {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.arrow-line {
+  fill: none;
+  stroke: #EFE6D6;
+  stroke-opacity: 0.55;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+/* Seats */
+.seat {
+  position: absolute;
+  z-index: 2;
+  transform: translate(-50%, -50%);
+  width: 112px;
+  margin: 0;
+  padding: 6px 4px 8px;
+  border-radius: 12px;
+  border: 1px solid var(--line-soft);
+  background-color: var(--surface);
+  color: var(--text);
+  font: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  text-align: center;
+  cursor: default;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, opacity 0.3s ease;
+}
+
+.seat:disabled { color: var(--text); }
+.seat.is-targetable { cursor: pointer; }
+.seat.is-targetable:hover { border-color: var(--line-strong); }
+
+.seat-tag {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.seat-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-display);
+  font-size: 18px;
+  line-height: 1.1;
+}
+
+.seat-lives {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 3px;
+}
+
+.seat-lives svg { width: 10px; height: 15px; }
+.seat-lives.is-many svg { width: 7px; height: 10px; }
+.seat-lives.is-many { gap: 2px; }
+
+.table-stage[data-size="medium"] .seat { width: 96px; }
+.table-stage[data-size="medium"] .seat-name { font-size: 16px; }
+.table-stage[data-size="small"] .seat { width: 70px; padding: 4px 3px 6px; gap: 2px; }
+.table-stage[data-size="small"] .seat-name { font-size: 14px; }
+.table-stage[data-size="small"] .seat-tag { font-size: 9px; letter-spacing: 0.03em; }
+.table-stage[data-size="small"] .seat-lives svg { width: 7px; height: 10px; }
+.table-stage[data-size="small"] .seat-lives { gap: 2px; }
+
+.seat.is-absent { border: 1px dashed var(--line-strong); }
+
+.seat.is-me { border: 1px solid var(--accent); }
+.seat.is-me .seat-tag { color: var(--accent); }
+
+/* My own turn: my seat glows turquoise. */
+.seat.is-me.is-turn {
+  border: 2px solid var(--accent);
+  box-shadow: 0 0 18px rgba(63, 181, 172, 0.55);
+}
+
+/* Someone else's turn: their seat glows ivory. */
+.seat.is-turn:not(.is-me) {
+  border: 2px solid #EFE6D6;
+  box-shadow: 0 0 16px rgba(239, 230, 214, 0.35);
+}
+
+.seat.is-turn:not(.is-me) .seat-tag { color: var(--text); }
+
+/* My chosen target (on my screen only): red. */
+.seat.is-target {
+  border: 2px solid #D9443A;
+  box-shadow: 0 0 14px rgba(217, 68, 58, 0.45);
+}
+
+.seat.is-target .seat-tag { color: #F08A7E; }
+
+.seat.is-out { opacity: 0.45; }
+
+.seat.is-hit { animation: seat-hit 0.5s ease-out; }
+
+@keyframes seat-hit {
+  0%, 100% { transform: translate(-50%, -50%); }
+  20% { transform: translate(calc(-50% - 4px), -50%); }
+  45% { transform: translate(calc(-50% + 3px), -50%); }
+  70% { transform: translate(calc(-50% - 2px), -50%); }
+}
+
+/* The revolver: turned around the table centre (JS sets the rotation). */
+.revolver {
+  position: absolute;
+  z-index: 1;
+  left: calc(50% - 90px);
+  top: calc(var(--cy) - 57px);
+  width: 180px;
+  height: 114px;
+  transform-origin: 90px 57px;
+  transition: transform 0.38s cubic-bezier(0.3, 0.7, 0.3, 1);
+  filter: drop-shadow(0 6px 6px rgba(0, 0, 0, 0.6));
+  pointer-events: none;
+}
+
+.revolver-svg { display: block; overflow: visible; }
+
+.rv-flash {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: 0% 46%;
+}
+
+.rv-body {
+  transform-box: fill-box;
+  transform-origin: 13% 74%;
+}
+
+.rv-hammer {
+  transform-box: fill-box;
+  transform-origin: 84% 100%;
+  transition: transform 0.6s ease-out;
+}
+
+/* Long press: the hammer is drawn back slowly, then the revolver trembles while held. */
+.revolver.is-cocking .rv-hammer { transform: rotate(-18deg); }
+.revolver.is-cocked .revolver-svg { animation: rv-tremble 0.09s linear infinite; }
+
+/* The shot (approved draft, conversation 8 model 3): cylinder 3 x 0.12 s, hammer at 0.38 s,
+   then flash + recoil (Dolu) or a dry click (Boş) at 0.44 s. revolver.js SHOT_TIMING matches. */
+.revolver.is-live .rv-flutes,
+.revolver.is-blank .rv-flutes { animation: rv-spin 0.12s linear 3; }
+.revolver.is-live .rv-hammer,
+.revolver.is-blank .rv-hammer { transition: none; animation: rv-hammer 0.06s ease-in 0.38s forwards; }
+.revolver.is-live .rv-body { animation: rv-recoil 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) 0.44s; }
+.revolver.is-blank .rv-body { animation: rv-click 0.2s ease-out 0.44s; }
+.revolver.is-live .rv-flash { animation: rv-flash 0.5s ease-out 0.44s; }
+
+@keyframes rv-spin { from { transform: translateY(0); } to { transform: translateY(14px); } }
+@keyframes rv-hammer { from { transform: rotate(0); } to { transform: rotate(32deg); } }
+@keyframes rv-recoil {
+  0% { transform: rotate(0); }
+  15% { transform: translateX(-8px) rotate(-10deg); }
+  45% { transform: translateX(-2px) rotate(-2deg); }
+  100% { transform: rotate(0); }
+}
+@keyframes rv-click {
+  0%, 100% { transform: translateX(0); }
+  30% { transform: translateX(-2px); }
+  60% { transform: translateX(1px); }
+}
+@keyframes rv-flash {
+  0% { opacity: 0; transform: scale(0.4); }
+  10% { opacity: 1; transform: scale(1.15); }
+  35% { opacity: 0; transform: scale(1.4); }
+  100% { opacity: 0; }
+}
+@keyframes rv-tremble {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(0.8px, -0.6px); }
+  50% { transform: translate(-0.6px, 0.8px); }
+  75% { transform: translate(0.6px, 0.4px); }
+}
+
+/* Reload announcement: a moment in the middle of the table, then gone. */
+.reload-banner {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  top: var(--cy);
+  transform: translate(-50%, -50%);
+  padding: 10px 20px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(63, 181, 172, 0.6);
+  background-color: rgba(21, 16, 12, 0.94);
+  box-shadow: 0 0 24px rgba(63, 181, 172, 0.35);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.reload-banner.is-showing { animation: reload-show 2.2s ease both; }
+
+.reload-kicker {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.reload-counts {
+  display: flex;
+  gap: 10px;
+  font-family: var(--font-display);
+  font-size: 28px;
+  line-height: 1;
+}
+
+.reload-live { color: #F08A7E; }
+.reload-blank { color: #8FDAD3; }
+.reload-dot { color: var(--muted); }
+
+@keyframes reload-show {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
+  12% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  85% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
+}
+
+/* Under the table: status, last move, hand, fire button. */
+.table-lower {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 0 18px 20px;
+}
+
+.table-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.table-status-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.table-status-text {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: normal;
+  font-size: 34px;
+  line-height: 1;
+  overflow-wrap: anywhere;
+}
+
+.table-last {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.effect-live { color: #F08A7E; font-weight: 600; }
+.effect-blank { color: #8FDAD3; font-weight: 600; }
+
+.table-ring {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+}
+
+.table-ring svg { display: block; }
+.ring-bar { stroke: #8C826C; transition: stroke-dasharray 0.2s linear; }
+.table-ring.is-mine .ring-bar { stroke: #C0392B; }
+
+.ring-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.table-note { margin: 0; }
+
+.hand {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hand-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.hand-title {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.hand-soon { font-size: 11px; color: var(--muted); }
+
+.hand-list {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+}
+
+.hand-tool {
+  flex-shrink: 0;
+  width: 54px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.hand-tool .tool-icon-small { width: 46px; height: 46px; opacity: 0.35; }
+
+.hand-name {
+  font-size: 10px;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.1;
+  opacity: 0.6;
+}
+
+.fire-wrap { margin-top: auto; }
+
+.fire-button {
+  width: 100%;
+  min-height: 76px;
+  margin: 0;
+  padding: 10px 8px;
+  border: 0;
+  border-radius: 18px;
+  background-color: var(--danger);
+  box-shadow: 0 6px 18px rgba(161, 29, 29, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  color: var(--text);
+  font: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  transition: transform 0.1s ease, background-color 0.2s ease;
+}
+
+.fire-main {
+  font-family: var(--font-display);
+  font-size: 32px;
+  line-height: 1;
+}
+
+.fire-sub { font-size: 13px; color: #F6D9D4; }
+
+.fire-button:disabled {
+  cursor: default;
+  background-color: #4A2220;
+  box-shadow: none;
+  color: rgba(239, 230, 214, 0.7);
+}
+
+.fire-button:disabled .fire-sub { color: rgba(246, 217, 212, 0.65); }
+
+.fire-button.is-pressing {
+  transform: scale(0.985);
+  background-color: #8E1818;
+}
+
+/* The last 5 seconds of my turn: the button pulses red. */
+.fire-button.is-urgent { animation: fire-pulse 1s ease-in-out infinite; }
+
+@keyframes fire-pulse {
+  0%, 100% { box-shadow: 0 6px 18px rgba(161, 29, 29, 0.45); }
+  50% { box-shadow: 0 0 0 4px rgba(217, 68, 58, 0.55), 0 0 28px rgba(217, 68, 58, 0.7); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .revolver { transition: none; }
+  .revolver.is-live .rv-flutes,
+  .revolver.is-blank .rv-flutes,
+  .revolver.is-live .rv-body,
+  .revolver.is-blank .rv-body,
+  .revolver.is-cocked .revolver-svg,
+  .seat.is-hit { animation: none; }
+  .rv-hammer { transition: none; }
+  .reload-banner.is-showing { animation: none; }
+  .fire-button.is-urgent {
+    animation: none;
+    box-shadow: 0 0 0 4px rgba(217, 68, 58, 0.55);
+  }
+}

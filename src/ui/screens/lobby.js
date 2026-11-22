@@ -7,7 +7,9 @@
 //
 // The host also orders the seats, starts the match (after an absent-players check) and manages
 // players through the "⋯" options; a player renames themself there. Tablo shows the last match
-// and the session. While a match runs, a temporary "Maç sürüyor" panel is shown.
+// and the session. While a match runs, the match table (screens/table.js) replaces the waiting
+// room; presence and the host watcher keep running underneath. When the match ends, the table
+// stays a moment on its final state, then the waiting room returns.
 
 import { h } from '../dom.js';
 import { copyText, errorLine, icon, screen } from '../components.js';
@@ -35,6 +37,7 @@ import { createSettingsSync } from '../settings-sync.js';
 import { toolIcon } from '../tools.js';
 import { createOptionsSheet, createSeatOrderSheet, createStartSheet } from '../lobby-sheets.js';
 import { createTablo } from '../tablo.js';
+import { createTable } from './table.js';
 import { ROOM_ERR } from '../../rooms/index.js';
 
 const LOST_CODES = [ROOM_ERR.SEAT_LOST, ROOM_ERR.NOT_MEMBER, ROOM_ERR.ROOM_NOT_FOUND];
@@ -98,17 +101,18 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
   const pageError = errorLine('lobby-error');
   if (message) pageError.show(message);
 
-  // Shown instead of the players and settings while a match runs (temporary).
-  const playingText = h('span');
-  const playingNotice = h('div', { class: 'notice', role: 'status', hidden: true }, icon('info'), playingText);
-
   const loadingLine = h('p', { class: 'loading', role: 'status', text: 'Yükleniyor…' });
   const body = h('div', { class: 'stack lobby-body', hidden: true },
-    pageError.el, codeCard, playingNotice, playersSection, settingsSection);
+    pageError.el, codeCard, playersSection, settingsSection);
   const bottom = h('div', { class: 'lobby-bottom' });
 
   const confirmDialog = buildLeaveDialog();
-  const root = screen('screen-lobby', topBar, loadingLine, body, bottom, confirmDialog.el);
+  const lobbyPart = h('div', { class: 'lobby-part' }, topBar, loadingLine, body, bottom);
+  const root = screen('screen-lobby', lobbyPart, confirmDialog.el);
+
+  // The match table, while a match runs (and a moment after it ended).
+  let table = null;
+  let tableClosing = false;
 
   // Bottom sheets and the Tablo (each destroyed when the screen is left).
   const sheetCtx = { api: ctx.api, uid: ctx.uid, code };
@@ -146,6 +150,7 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
     seatOrderSheet.destroy();
     startSheet.destroy();
     tablo.destroy();
+    closeTable();
   }
 
   view.onLeave(() => {
@@ -193,15 +198,23 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
     const playing = next.meta.status === 'playing';
     // Leaving is possible only between matches (leaveRoom refuses with NOT_IN_LOBBY).
     leaveButton.disabled = playing;
-    // During a match the Tablo belongs to the table screen (next step).
+    // During a match the Tablo belongs to the table screen (a later step).
     tabloButton.disabled = playing;
     if (playing) tablo.close();
     leaveButton.title = playing ? 'Maç sırasında masadan çıkılamaz' : '';
-    playingNotice.hidden = !playing;
-    playersSection.hidden = playing;
-    settingsSection.hidden = playing;
-    if (playing) {
-      showPlaying(rows);
+    if (playing && !table) openTable(next);
+    if (table) {
+      table.setRoom({ names: Object.fromEntries(rows.map((row) => [row.seatId, row.name])), presence: next.presence });
+      if (!playing && !tableClosing) {
+        // The match ended: let the table show its last shot and result, then the waiting room.
+        tableClosing = true;
+        const closing = table;
+        closing.finish().then(() => {
+          if (ended || table !== closing) return;
+          closeTable();
+          if (lobby) render(lobby);
+        });
+      }
       return;
     }
     renderPlayers(rows);
@@ -412,18 +425,39 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
     }
   }
 
-  // --- A match is running (temporary) -------------------------------------------------------
-  function showPlaying(rows) {
+  // --- A match is running: the table ---------------------------------------------------------
+  function openTable(next) {
     bottom.replaceChildren();
     // Settings cannot change during a match: a pending change is dropped by the role reset.
     if (sync) sync.dispose();
     sync = null;
     isHost = null;
     hostUi = null;
-    const me = rows.find((row) => row.me);
-    playingText.textContent = me?.waiting
-      ? 'Maç sürüyor. Bu maçı izleyeceksin, sonraki maçta oynarsın.'
-      : 'Maç sürüyor. Maç ekranı yakında burada olacak.';
+    confirmDialog.close();
+    table = createTable({
+      api: ctx.api,
+      uid: ctx.uid,
+      code,
+      mode: next.meta.mode,
+      mySeat,
+      watchServerOffset: ctx.watchServerOffset,
+      onLost: onLiveError,
+    });
+    tableClosing = false;
+    lobbyPart.hidden = true;
+    root.append(table.el);
+    document.title = 'Son Çay: masa';
+    window.scrollTo(0, 0);
+  }
+
+  function closeTable() {
+    if (!table) return;
+    table.destroy();
+    table.el.remove();
+    table = null;
+    tableClosing = false;
+    lobbyPart.hidden = false;
+    if (view.active()) document.title = 'Son Çay: bekleme salonu';
   }
 
   // --- Invite link -----------------------------------------------------------------------------

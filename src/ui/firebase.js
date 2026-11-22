@@ -64,7 +64,8 @@ const FIREBASE_CONFIG = {
 
 /**
  * Starts Firebase, signs in anonymously (or restores this tab's user) and returns the room API.
- * @returns {Promise<{ api: ReturnType<typeof createRoomApi>, uid: string }>}
+ * @returns {Promise<{ api: ReturnType<typeof createRoomApi>, uid: string,
+ *   watchServerOffset: (onChange: (offset: number) => void) => () => void }>}
  */
 export async function connect() {
   // WebSocket only: after one failed WebSocket the SDK would otherwise fall back to
@@ -80,5 +81,10 @@ export async function connect() {
   await auth.authStateReady();
   const user = auth.currentUser ?? (await signInAnonymously(auth)).user;
   const api = createRoomApi({ db, ref, get, update, serverTimestamp, onValue, onDisconnect, runTransaction });
-  return { api, uid: user.uid };
+  // The server clock offset (server time = local time + offset), for the table's countdown.
+  // Reads only; returns the function that stops listening.
+  const watchServerOffset = (onChange) => onValue(ref(db, '.info/serverTimeOffset'), (snapshot) => {
+    onChange(Number(snapshot.val()) || 0);
+  });
+  return { api, uid: user.uid, watchServerOffset };
 }
