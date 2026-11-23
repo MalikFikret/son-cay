@@ -23,9 +23,7 @@ function playToEnd(seed = 3, ids = IDS) {
   const seen = Object.fromEntries(ids.map((id) => [id, eventsFor(events, id)]));
   const log = [events];
   for (let i = 0; i < 500 && state.status === 'active'; i += 1) {
-    const action = state.phase.type === 'loot'
-      ? { type: 'timeout', seq: state.clock.seq }
-      : listLegalActions(state, state.turn.playerId).find((a) => a.type === 'chooseTarget' && a.target !== state.turn.playerId);
+    const action = listLegalActions(state, state.turn.playerId).find((a) => a.type === 'chooseTarget' && a.target !== state.turn.playerId);
     const res = applyAction(state, action);
     assert.ok(res.ok, res.error?.message);
     state = res.state;

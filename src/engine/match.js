@@ -12,7 +12,7 @@ import { pub, priv } from './events.js';
 import { startRound } from './roulette.js';
 import { fire } from './shot.js';
 import { abandonPendingTool, handleHandSwapTarget, handleStealChoice, handleUseTool } from './tools.js';
-import { forfeitLoot, handleLootChoice } from './loot.js';
+import { handleLootChoice } from './loot.js';
 import { handleBuy, handleTransfer } from './economy.js';
 import { handleRansomAccept, handleRansomOffer, handleRansomReject, handleRansomWithdraw } from './jail.js';
 import { handlePredict } from './ghosts.js';
@@ -87,6 +87,7 @@ export function createMatch(config, players, seed) {
     shields: { shot: [], tool: [] },
     jailed: false,
     ransomOffer: null,
+    loots: [],
     confirmShot: p.confirmShot,
     privateInfo: null,
   }));
@@ -153,21 +154,15 @@ function handleSetPreference(ctx, action) {
   priv(ctx, player.id, 'preferenceSet', { player: player.id, confirmShot: player.confirmShot });
 }
 
-// The host's timer ran out.
-// - loot pending:      the looter forfeits this loot.
-// - anything else:     any pending step (aim, hand swap, steal) is abandoned
-//                      and the current chamber is fired at the turn player.
-//                      Like any self shot: a blank keeps the turn (with a fresh
-//                      clock), a live passes it.
+// The host's timer ran out: any pending step (aim, hand swap, steal) is
+// abandoned and the current chamber is fired at the turn player. Like any self
+// shot: a blank keeps the turn (with a fresh clock), a live passes it.
+// Loot never uses this clock (decision 63: the looter's device sends the
+// loot's own expiry as a lootChoice).
 function handleTimeout(ctx, action) {
   const s = ctx.state;
   if (action.seq !== undefined && action.seq !== s.clock.seq) {
     reject(ERR.STALE_TIMEOUT, 'this timeout belongs to an older timer');
-  }
-  if (s.phase.type === 'loot') {
-    pub(ctx, 'timedOut', { player: s.phase.queue[0].looter, kind: 'loot' });
-    forfeitLoot(ctx);
-    return;
   }
   const playerId = s.turn.playerId;
   pub(ctx, 'timedOut', { player: playerId, kind: 'shot' });

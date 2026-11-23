@@ -127,11 +127,10 @@ describe('the revolver', () => {
     assert.equal(pointsLeft(90), false);
   });
 
-  test('points at my chosen target on my screen, otherwise at the current player (or the looter)', () => {
+  test('points at my chosen target on my screen, otherwise at the current player (never a looter)', () => {
     const view = { turn: { playerId: 's02' }, phase: { type: 'turn' } };
     assert.equal(revolverSeat({ target: 's04', view }), 's04');
     assert.equal(revolverSeat({ target: null, view }), 's02');
-    assert.equal(revolverSeat({ target: null, view: { ...view, phase: { type: 'loot', queue: [{ looter: 's03', victim: 's01' }] } } }), 's03');
   });
 });
 
@@ -352,15 +351,13 @@ describe('a played match through the views (what watchMatch gives each seat)', (
       const legal = listLegalActions(state, shooter);
       const targets = targetsFrom(legal);
       const before = ids.map((id) => JSON.stringify(viewFor(state, id)));
-      let res;
-      if (state.phase.type === 'loot') res = applyAction(state, { type: 'timeout', seq: state.clock.seq });
-      else res = applyAction(state, { type: 'chooseTarget', playerId: shooter, target: targets[i % targets.length] });
+      const res = applyAction(state, { type: 'chooseTarget', playerId: shooter, target: targets[i % targets.length] });
       assert.ok(res.ok, res.error?.message);
       // Before the shot, no view knows the target (nothing was sent but the shot itself).
       for (const view of before) assert.doesNotMatch(view, /"pending":\{"type":"confirm"/);
       for (const id of ids) {
         const shots = shotsIn(eventsFor(res.events, id));
-        if (state.phase.type !== 'loot') assert.equal(shots.length, 1);
+        assert.equal(shots.length, 1);
       }
       state = res.state;
     }

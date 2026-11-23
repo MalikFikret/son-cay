@@ -7,6 +7,7 @@
 
 import { TOOL_INFO } from './constants.js';
 import { alivePlayers, getPlayer } from './util.js';
+import { lootsOf } from './loot.js';
 
 function unique(list) {
   return list.filter((item, i) => list.indexOf(item) === i);
@@ -73,13 +74,14 @@ export function listLegalActions(state, playerId) {
     }
   }
 
-  if (phase === 'loot' && state.phase.queue[0].looter === playerId) {
-    const victim = getPlayer(state, state.phase.queue[0].victim);
-    actions.push({ type: 'lootChoice', playerId, choice: { kind: 'none' } });
+  // Open loots (decision 63): at any time, in any phase, whoever's turn it is.
+  for (const loot of lootsOf(me)) {
+    const victim = getPlayer(state, loot.victim);
+    actions.push({ type: 'lootChoice', playerId, victim: victim.id, choice: { kind: 'none' } });
     for (const tool of unique(victim.hand)) {
-      actions.push({ type: 'lootChoice', playerId, choice: { kind: 'tool', tool } });
+      actions.push({ type: 'lootChoice', playerId, victim: victim.id, choice: { kind: 'tool', tool } });
     }
-    if (custom) actions.push({ type: 'lootChoice', playerId, choice: { kind: 'coins' } });
+    if (custom) actions.push({ type: 'lootChoice', playerId, victim: victim.id, choice: { kind: 'coins' } });
   }
 
   actions.push({ type: 'setPreference', playerId, confirmShot: !me.confirmShot });

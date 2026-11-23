@@ -67,7 +67,7 @@ test('contract: applyAction never mutates the state it is given', () => {
   const snapshot = JSON.stringify(state);
   const first = state;
   for (let i = 0; i < 300 && state.status === 'active'; i++) {
-    const actor = state.phase.type === 'loot' ? state.phase.queue[0].looter : state.turn.playerId;
+    const actor = state.turn.playerId;
     const legal = listLegalActions(state, actor);
     const res = applyAction(state, legal[i % legal.length]);
     assert.equal(res.ok, true);
@@ -111,7 +111,7 @@ test('contract: a state that went through JSON behaves exactly the same', () => 
   let a = createMatch({ mode: 'custom' }, ids(6).map((id) => ({ id })), 55).state;
   let b = JSON.parse(JSON.stringify(a));
   for (let i = 0; i < 200 && a.status === 'active'; i++) {
-    const actor = a.phase.type === 'loot' ? a.phase.queue[0].looter : a.turn.playerId;
+    const actor = a.turn.playerId;
     const legal = listLegalActions(a, actor);
     const action = legal[(i * 7) % legal.length];
     const ra = applyAction(a, action);
@@ -157,7 +157,7 @@ test('contract: malformed actions are rejected, never thrown', () => {
     [{ type: 'useTool', playerId: 'p1', tool: 'link', targets: [null, 'p3'] }, ERR.INVALID_TARGET],
     [{ type: 'useTool', playerId: 'p1', tool: 'jail', target: 3 }, ERR.INVALID_TARGET],
     [{ type: 'useTool', playerId: 'p1', tool: '__proto__' }, ERR.UNKNOWN_TOOL],
-    [{ type: 'lootChoice', playerId: 'p1', choice: 'heal' }, ERR.WRONG_PHASE],
+    [{ type: 'lootChoice', playerId: 'p1', victim: 'p2', choice: 'heal' }, ERR.NO_LOOT],
     [{ type: 'ransomAccept', playerId: 'p1', from: null }, ERR.INVALID_ACTION],
     [{ type: 'timeout', seq: 'now' }, ERR.STALE_TIMEOUT],
   ];
@@ -211,7 +211,7 @@ test('legal actions: everything listed is accepted, for every player, at every s
           assert.equal(res.ok, true, `${JSON.stringify(action)} -> ${JSON.stringify(res.error)}`);
         }
       }
-      const actor = state.phase.type === 'loot' ? state.phase.queue[0].looter : state.turn.playerId;
+      const actor = state.turn.playerId;
       const legal = listLegalActions(state, actor);
       state = applyAction(state, legal[(step * 13) % legal.length]).state;
       if (step % 9 === 0 && state.status === 'active') state = applyAction(state, { type: 'timeout' }).state;

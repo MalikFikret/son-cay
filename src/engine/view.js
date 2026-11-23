@@ -2,8 +2,8 @@
 //
 // Public for everyone: seats, HP, who is alive / jailed, links, turn, the
 // counts announced at the last reload, the number of shots fired this round,
-// a pending double, a pending steal / loot (who, never what), the shop stock,
-// and the config.
+// a pending double, a pending steal (who, never what), the shop stock, and the
+// config. Loot is never public (decision 63): not even that one is open.
 //
 // Never exposed to anyone: the chamber order, the remaining live/blank
 // counts, the PRNG state.
@@ -11,18 +11,17 @@
 // Private to their owner: hand, coins, shields, private info, ransom offers,
 // the tools-used counter, the confirmation preference, a ghost's prediction,
 // and the secret content of a pending step (aimed target, steal peek,
-// hand-size peek, loot).
+// hand-size peek) and the looter's open loots.
 
 import { clone, getPlayer, hasOwn } from './util.js';
 import { handCounts } from './tools.js';
+import { lootsOf } from './loot.js';
 
 function publicPhase(state) {
   const phase = state.phase;
   switch (phase.type) {
     case 'steal':
       return { type: 'steal', thief: state.turn.playerId, victim: phase.victim };
-    case 'loot':
-      return { type: 'loot', queue: clone(phase.queue) };
     case 'ended':
       return { type: 'ended' };
     default:
@@ -47,15 +46,6 @@ function privatePending(state, me) {
   }
   if (phase.type === 'steal' && isCurrent) {
     return { type: 'steal', victim: phase.victim, tools: getPlayer(state, phase.victim).hand.slice() };
-  }
-  if (phase.type === 'loot' && phase.queue[0].looter === me.id) {
-    const victim = getPlayer(state, phase.queue[0].victim);
-    return {
-      type: 'loot',
-      victim: victim.id,
-      tools: victim.hand.slice(),
-      coinsOption: state.config.mode === 'custom',
-    };
   }
   return null;
 }
@@ -114,6 +104,13 @@ export function viewFor(state, playerId) {
         .filter((p) => p.ransomOffer && p.ransomOffer.to === me.id)
         .map((p) => ({ from: p.id, ...clone(p.ransomOffer) })),
       pending: privatePending(state, me),
+      // My open loots (decision 63): the victim's tools, private to me.
+      loots: lootsOf(me).map((loot) => ({
+        victim: loot.victim,
+        tools: getPlayer(state, loot.victim).hand.slice(),
+        coinsOption: custom,
+        clockSeq: loot.clockSeq,
+      })),
       coins: custom ? me.coins : null,
       privateInfo: custom ? clone(me.privateInfo) : null,
     };

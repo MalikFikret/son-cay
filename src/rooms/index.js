@@ -18,7 +18,16 @@ export {
   playerIdIn,
 } from './match-helpers.js';
 export { SHOT_KINDS, orderBySurvival, summarizeMatch, summarizeView } from './match-summary.js';
-export { BACKUP_DELAY_MS, BACKUP_JITTER_MS, createClockRunner, planTimeout } from './clock.js';
+export {
+  BACKUP_DELAY_MS,
+  BACKUP_JITTER_MS,
+  CLOCK_MEMORY_SIZE,
+  createClockRunner,
+  createLootRunner,
+  lootDeadline,
+  planTimeout,
+  rememberClockAt,
+} from './clock.js';
 export { CODE_ALPHABET, CODE_LENGTH, generateRoomCode, isValidRoomCode, normalizeRoomCode } from './code.js';
 export { ROOM_ERR, RoomError, isPermissionDenied } from './errors.js';
 export { HOST_ABSENCE_MS, absentSince, chooseNewHost, isHostAbsentLongEnough, isSeatPresent } from './host.js';

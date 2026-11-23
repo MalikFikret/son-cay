@@ -145,12 +145,20 @@ function playMatch(seed, mode, stats) {
       action = { type: 'removePlayer', target: rnd.pick(state.players.filter((p) => p.alive)).id };
       stats.removals += 1;
     } else {
-      const mustAct = state.phase.type === 'loot' ? state.phase.queue[0].looter : state.turn.playerId;
-      const actor = rnd.chance(0.7) ? mustAct : rnd.pick(state.players).id;
-      const legal = listLegalActions(state, actor);
-      if (legal.length === 0) continue;
-      const progress = legal.filter((a) => PROGRESS.includes(a.type));
-      action = progress.length > 0 && rnd.chance(0.4) ? rnd.pick(progress) : rnd.pick(legal);
+      // Loot never blocks (decision 63): looters choose (or let it expire) at random moments.
+      const looters = state.players.filter((p) => (p.loots ?? []).length > 0);
+      if (looters.length > 0 && rnd.chance(0.25)) {
+        const looter = rnd.pick(looters);
+        const loot = rnd.pick(looter.loots);
+        const choices = listLegalActions(state, looter.id).filter((a) => a.type === 'lootChoice' && a.victim === loot.victim);
+        action = rnd.chance(0.3) ? { type: 'lootChoice', playerId: looter.id, victim: loot.victim, choice: { kind: 'none' }, expired: true } : rnd.pick(choices);
+      } else {
+        const actor = rnd.chance(0.7) ? state.turn.playerId : rnd.pick(state.players).id;
+        const legal = listLegalActions(state, actor);
+        if (legal.length === 0) continue;
+        const progress = legal.filter((a) => PROGRESS.includes(a.type));
+        action = progress.length > 0 && rnd.chance(0.4) ? rnd.pick(progress) : rnd.pick(legal);
+      }
     }
 
     const res = applyAction(state, action);
@@ -159,6 +167,7 @@ function playMatch(seed, mode, stats) {
     history.push(action);
     state = deepFreeze(res.state); // any later in-place mutation would throw
     log.push(...res.events);
+    stats.loots += res.events.filter((e) => e.type === 'lootOffer').length;
 
     checkEvents(state, res.events);
     checkState(state);
@@ -205,13 +214,14 @@ function playMatch(seed, mode, stats) {
 
 for (const mode of ['classic', 'custom']) {
   test(`fuzz: ${MATCHES_PER_MODE} random ${mode} matches keep every invariant`, () => {
-    const stats = { matches: 0, actions: 0, win: 0, draw: 0, removals: 0 };
+    const stats = { matches: 0, actions: 0, win: 0, draw: 0, removals: 0, loots: 0 };
     const offset = mode === 'classic' ? 0 : 1000000;
     for (let i = 0; i < MATCHES_PER_MODE; i++) playMatch(BASE_SEED + offset + i, mode, stats);
     assert.equal(stats.matches, MATCHES_PER_MODE);
     assert.equal(stats.win + stats.draw, MATCHES_PER_MODE);
     assert.ok(stats.win > 0, 'at least some matches end with a winner');
     assert.ok(stats.removals > 0, 'the host removal action is exercised');
+    assert.ok(stats.loots > 0, 'loot offers are exercised');
   });
 }
 
@@ -227,7 +237,7 @@ test('fuzz: every tool id is exercised by the random matches', () => {
       let steps = 0;
       while (state.status === 'active' && steps++ < MAX_STEPS) {
         const actor = rnd.chance(0.8) ? state.turn.playerId : rnd.pick(state.players).id;
-        const legal = listLegalActions(state, state.phase.type === 'loot' ? state.phase.queue[0].looter : actor);
+        const legal = listLegalActions(state, actor);
         if (legal.length === 0) continue;
         const action = rnd.pick(legal);
         const res = applyAction(state, action);

@@ -142,9 +142,9 @@
         return res;
       }
 
-      // Whoever has to act for the match to move on.
+      // Whoever has to act for the match to move on (loot never blocks since decision 63).
       function actor() {
-        return state.phase.type === 'loot' ? state.phase.queue[0].looter : state.turn.playerId;
+        return state.turn.playerId;
       }
 
       const PROGRESS = ['chooseTarget', 'confirmShot', 'lootChoice', 'stealChoice', 'handSwapTarget'];
@@ -185,7 +185,7 @@
           case 'stealChoice':
             return a.take === null ? 'take nothing' : `take ${a.take}, give ${a.give}`;
           case 'lootChoice':
-            return a.choice.kind === 'tool' ? `loot ${a.choice.tool}` : `loot ${a.choice.kind}`;
+            return a.choice.kind === 'tool' ? `loot ${a.victim}: ${a.choice.tool}` : `loot ${a.victim}: ${a.choice.kind}`;
           case 'setPreference':
             return `confirmation ${a.confirmShot ? 'on' : 'off'}`;
           case 'buy':

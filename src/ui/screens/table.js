@@ -7,7 +7,9 @@
 // hand and the fire button on my turn, or the "İzliyorsun" strip for a player who is out or a
 // seat that joined during the match. Tools (task 4.3a): a tap on a tool opens its card; a tool
 // with a target is aimed on the table (the pick bar replaces the fire button meanwhile); El
-// Değiştir shows the tool COUNTS on the seats, Çal its own sheet with the victim's tools. The host sees a kick button on a disconnected
+// Değiştir shows the tool COUNTS on the seats, Çal its own sheet with the victim's tools.
+// Loot (task 4.3b, decision 63): the looter alone gets a "Ganimet" card above the hand, one row
+// per victim, with its own 15 s countdown; the game goes on meanwhile. The host sees a kick button on a disconnected
 // player's seat (removeAbsentPlayer). After the last shot the end screen (approved mocks 6-8 of
 // conversation 13) replaces the table until the player presses "Salona dön".
 //
@@ -46,6 +48,7 @@ import {
   toolErrorText,
   toolTargets,
 } from '../tool-model.js';
+import { keepLootPick, lootAction, lootCards, lootErrorText, lootPick, lootTexts } from '../loot-model.js';
 import { revolverSvg, SHOT_TIMING } from '../revolver.js';
 import { LONG_PRESS_MS, PRESS, initialPress, isPressing, pressStep } from '../fire-press.js';
 import {
@@ -123,6 +126,8 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
   let picking = null;
   let expanded = null; // the effects strip item shown with its text
   let stealSeen = null; // the Çal step whose sheet was opened automatically
+  const lootPicks = new Map(); // victim -> { index, tool }: my selection on a Ganimet card
+  let lootSending = false;
 
   // --- Static parts --------------------------------------------------------------------------
   const roundTitle = h('span', { class: 'table-round' });
@@ -170,6 +175,10 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
   const errors = errorLine('table-error');
   const strip = h('p', { class: 'watch-strip', role: 'status', hidden: true });
 
+  // The Ganimet cards (approved mocks 1 and 2 of conversation 13): mine only, above the hand.
+  const lootWrap = h('div', { class: 'loot-cards', hidden: true });
+  const lootEls = new Map(); // victim -> { el, ringBar, ring, seconds, key, over }
+
   const handTitle = h('span', { class: 'hand-title' });
   const handUsed = h('span', { class: 'hand-used' });
   const handList = h('div', { class: 'hand-list' });
@@ -194,7 +203,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
 
   const tableView = h('div', { class: 'table-view' },
     topBar, stage,
-    h('div', { class: 'table-lower' }, status, effects, errors.el, hand, strip, stepBar, fireWrap),
+    h('div', { class: 'table-lower' }, status, effects, errors.el, lootWrap, hand, strip, stepBar, fireWrap),
     reloadLive2);
 
   // End screen (filled when the match is over).
@@ -490,6 +499,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
       picking = null;
       expanded = null;
       stealSeen = null;
+      lootPicks.clear();
     }
     const shots = shotsIn(update.events);
     if (animate && applied) {
@@ -577,6 +587,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
     renderSeats(view);
     renderStatus(view);
     renderEffects(view);
+    renderLoot();
     renderHand(view);
     renderStep();
     renderFire();
@@ -721,6 +732,122 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
     strip.textContent = watching ?? '';
   }
 
+  // --- Ganimet (decision 63) ------------------------------------------------------------------
+  // Only this device's own view has loots (view.self.loots), so only the looter draws anything.
+  const lootList = () => (applied ? lootCards(applied.view, applied.lootDeadlines, Date.now() + offset) : []);
+
+  function renderLoot() {
+    const cards = lootList();
+    lootWrap.hidden = cards.length === 0;
+    for (const victim of [...lootPicks.keys()]) if (!cards.some((c) => c.victim === victim)) lootPicks.delete(victim);
+    for (const [victim, entry] of lootEls) {
+      if (!cards.some((c) => c.victim === victim)) {
+        entry.el.remove();
+        lootEls.delete(victim);
+      }
+    }
+    for (const card of cards) {
+      const kept = lootPicks.get(card.victim);
+      const index = kept ? keepLootPick(kept.index, card, kept.tool) : null;
+      if (index === null) lootPicks.delete(card.victim);
+      const over = card.ms === 0;
+      const key = JSON.stringify([card.tools, card.empty, index, lootSending, over, nameOf(card.victim)]);
+      let entry = lootEls.get(card.victim);
+      if (!entry || entry.key !== key) {
+        const built = buildLootCard(card, index);
+        if (entry) entry.el.replaceWith(built.el);
+        else lootWrap.append(built.el);
+        entry = { ...built, key, over };
+        lootEls.set(card.victim, entry);
+      }
+    }
+    // Keep the engine's order.
+    for (const card of cards) lootWrap.append(lootEls.get(card.victim).el);
+    updateLootTimers(cards);
+  }
+
+  function buildLootCard(card, index) {
+    const texts = lootTexts(card, nameOf);
+    const ringBar = svg(['circle', { cx: 20, cy: 20, r: 16, fill: 'none', 'stroke-width': 3.5, transform: 'rotate(-90 20 20)', class: 'loot-ring-bar' }]);
+    const ringSvg = svg(['svg', { width: 40, height: 40, viewBox: '0 0 40 40', 'aria-hidden': 'true' },
+      ['circle', { cx: 20, cy: 20, r: 16, fill: 'none', stroke: '#3A2E24', 'stroke-width': 3.5 }]]);
+    ringSvg.append(ringBar);
+    const seconds = h('span', { class: 'loot-seconds', role: 'timer' });
+    const ring = h('div', { class: 'loot-ring' }, ringSvg, seconds);
+    const over = card.ms === 0;
+    let body;
+    if (card.empty) {
+      body = h('div', { class: 'loot-row' },
+        h('div', { class: 'loot-empty' },
+          h('span', { class: 'loot-empty-title', text: TEXT.lootEmpty }),
+          h('span', { class: 'loot-sub', text: TEXT.lootNothing })),
+        h('button', { type: 'button', class: 'btn-loot btn-loot-ok', text: texts.button, disabled: lootSending || over, on: { click: () => sendLoot(lootAction(card, null)) } }));
+    } else {
+      const action = lootAction(card, index);
+      body = h('div', { class: 'loot-row' },
+        h('div', { class: 'loot-tools' }, ...card.tools.map((item) => h('button', {
+          type: 'button',
+          class: item.index === index ? 'loot-tool is-picked' : 'loot-tool',
+          'aria-label': item.name,
+          'aria-pressed': String(item.index === index),
+          disabled: lootSending || over,
+          on: {
+            click: () => {
+              const next = lootPick(index, item.index);
+              if (next === null) lootPicks.delete(card.victim);
+              else lootPicks.set(card.victim, { index: next, tool: item.tool });
+              renderLoot();
+            },
+          },
+        }, h('span', { class: 'loot-tool-badge' }, toolIcon(item.tool, 'small')), h('span', { class: 'loot-tool-name', text: item.name })))),
+        h('button', { type: 'button', class: 'btn-loot btn-loot-take', text: texts.button, disabled: lootSending || action === null, on: { click: () => sendLoot(lootAction(card, index)) } }));
+    }
+    const el = h('section', { class: 'loot-card', 'aria-label': TEXT.lootLabel },
+      h('div', { class: 'loot-head' },
+        h('div', { class: 'loot-head-text' },
+          h('span', { class: 'loot-title', text: texts.title }),
+          h('span', { class: 'loot-sub', text: texts.sub })),
+        ring),
+      body);
+    return { el, ringBar, ring, seconds };
+  }
+
+  // The countdowns (every tick): the ring and the seconds, turquoise, never red (decision 54).
+  const LOOT_RING = 2 * Math.PI * 16;
+  function updateLootTimers(cards = lootList()) {
+    let redraw = false;
+    for (const card of cards) {
+      const entry = lootEls.get(card.victim);
+      if (!entry) continue;
+      entry.ring.hidden = card.seconds === null;
+      if (card.seconds !== null) {
+        entry.seconds.textContent = String(card.seconds);
+        entry.seconds.setAttribute('aria-label', TEXT.secondsLeft(card.seconds));
+        entry.ringBar.setAttribute('stroke-dasharray', `${(card.fraction * LOOT_RING).toFixed(1)} ${LOOT_RING.toFixed(1)}`);
+      }
+      // The time is up: the buttons go off (the expiry from runMatchClock then closes the card).
+      if ((card.ms === 0) !== entry.over) redraw = true;
+    }
+    if (redraw) renderLoot();
+  }
+
+  // The choice leaves this device only inside the lootChoice action (sent as my own seat).
+  async function sendLoot(action) {
+    if (!action || lootSending) return;
+    lootSending = true;
+    renderLoot();
+    try {
+      const result = await api.submitAction({ uid, code, action });
+      if (!destroyed && !result.ok) showError(lootErrorText(result.error));
+      if (!destroyed && result.ok) lootPicks.delete(action.victim);
+    } catch (error) {
+      report(error);
+    } finally {
+      lootSending = false;
+      if (!destroyed) renderLoot();
+    }
+  }
+
   // My hand (decision 54): small badges on every turn, turn tools faded on others' turns, and on
   // my turn "bu sıra N/M". A tap opens the tool's card (no long press).
   function renderHand(view) {
@@ -833,6 +960,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
       ringBar.setAttribute('stroke-dasharray', `${((ms / total) * RING).toFixed(1)} ${RING.toFixed(1)}`);
       ring.classList.toggle('is-mine', applied.view.clock.playerId === mySeat);
     }
+    updateLootTimers();
     // In the open Tablo, on my turn: the red "Sıra sende" bar with the seconds.
     tablo.setTurnBar(myTurn() && ms !== null ? secondsShown(ms) : null);
     const urgent = myTurn() && ms !== null && ms <= URGENT_MS && ms > 0;

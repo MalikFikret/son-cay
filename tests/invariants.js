@@ -15,8 +15,6 @@ export const PUBLIC_EVENT_FIELDS = {
   toolUsed: ['tool', 'by', 'target', 'targets', 'direction', 'hp'],
   toolBlocked: ['tool', 'by', 'blockedBy'],
   eliminated: ['player', 'by', 'round'],
-  lootStarted: ['looter', 'victim'],
-  lootResolved: ['looter', 'victim'],
   roundEnded: ['round', 'shots', 'survivors'],
   predictionResolved: ['player', 'round', 'prediction', 'correct'],
   jailReleased: ['player', 'reason'],
@@ -69,6 +67,21 @@ export function checkState(state) {
       assert.equal(p.ransomOffer, null);
       assert.equal(p.privateInfo, null);
     }
+    // Open loots (decision 63): held by a living looter, each on a different
+    // eliminated victim, never looted twice; only a looted victim keeps tools.
+    const loots = p.loots ?? [];
+    if (!p.alive) assert.deepEqual(loots, [], 'a player who is out holds no loot');
+    for (const loot of loots) {
+      const victim = state.players.find((q) => q.id === loot.victim);
+      assert.ok(victim && !victim.alive && victim.id !== p.id, 'a loot is on an eliminated player');
+      assert.ok(Number.isInteger(loot.clockSeq) && loot.clockSeq <= state.clock.seq);
+      const holders = state.players.filter((q) => (q.loots ?? []).some((l) => l.victim === loot.victim));
+      assert.equal(holders.length, 1, 'a victim is looted once');
+      assert.equal((p.loots ?? []).filter((l) => l.victim === loot.victim).length, 1);
+    }
+    if (!p.alive && (p.hand.length > 0 || p.coins > 0)) {
+      assert.ok(state.players.some((q) => (q.loots ?? []).some((l) => l.victim === p.id)), `${p.id} is out but keeps tools without an open loot`);
+    }
     if (p.ransomOffer) {
       assert.ok(p.jailed, 'only a jailed player has an offer');
       const to = state.players.find((q) => q.id === p.ransomOffer.to);
@@ -115,24 +128,17 @@ export function checkState(state) {
     assert.ok(round.cursor < round.chambers.length, 'an active match always has a current chamber');
     assert.ok(idsAll.includes(state.turn.playerId));
     const phase = state.phase.type;
-    assert.ok(['turn', 'confirm', 'handSwap', 'steal', 'loot'].includes(phase));
-    // No stuck state: whoever must act always has a move that makes progress.
-    let actor = state.turn.playerId;
+    assert.ok(['turn', 'confirm', 'handSwap', 'steal'].includes(phase));
+    // No stuck state: the turn player always has a move that makes progress.
+    // Loot never blocks (decision 63): the clock is always a shot clock.
+    const actor = state.turn.playerId;
     let progress = ['chooseTarget'];
-    if (phase === 'loot') {
-      assert.ok(state.phase.queue.length > 0);
-      actor = state.phase.queue[0].looter;
-      progress = ['lootChoice'];
-      const victim = state.players.find((p) => p.id === state.phase.queue[0].victim);
-      assert.equal(victim.alive, false);
-    } else {
-      assert.ok(state.players.find((p) => p.id === actor).alive, 'the turn player is alive');
-      if (phase === 'handSwap') progress = ['handSwapTarget'];
-      if (phase === 'steal') progress = ['stealChoice'];
-      if (phase === 'confirm') progress = ['confirmShot'];
-    }
-    assert.ok(state.players.find((p) => p.id === actor).alive);
-    assert.equal(state.clock.playerId, actor, 'the clock runs for whoever must act');
+    if (phase === 'handSwap') progress = ['handSwapTarget'];
+    if (phase === 'steal') progress = ['stealChoice'];
+    if (phase === 'confirm') progress = ['confirmShot'];
+    assert.ok(state.players.find((p) => p.id === actor).alive, 'the turn player is alive');
+    assert.equal(state.clock.kind, 'shot');
+    assert.equal(state.clock.playerId, actor, 'the clock runs for the turn player');
     assert.ok(
       listLegalActions(state, actor).some((a) => progress.includes(a.type)),
       `stuck: ${actor} has no ${progress.join('/')} action in phase ${phase}`,
@@ -140,6 +146,7 @@ export function checkState(state) {
   } else {
     assert.equal(state.status, 'ended');
     assert.equal(state.phase.type, 'ended');
+    for (const p of state.players) assert.deepEqual(p.loots ?? [], [], 'the end of the match closes every loot');
     if (state.result.type === 'win') {
       assert.equal(alive.length, 1);
       assert.equal(state.result.winner, alive[0].id);
@@ -178,7 +185,7 @@ export function scrambleSecrets(state, viewerId) {
     const seesHand =
       viewerAlive &&
       ((phase.type === 'steal' && isCurrent && phase.victim === p.id) ||
-        (phase.type === 'loot' && phase.queue[0].looter === viewerId && phase.queue[0].victim === p.id));
+        (viewer.loots ?? []).some((l) => l.victim === p.id));
     const seesHandSize = viewerAlive && phase.type === 'handSwap' && isCurrent && p.alive;
     if (!seesHand) {
       p.hand = seesHandSize ? p.hand.map((t) => (t === 'heal' ? 'jail' : 'heal')) : [...p.hand, 'detector', 'flip'];
@@ -187,6 +194,8 @@ export function scrambleSecrets(state, viewerId) {
     p.shields = { shot: [0, 0, 999], tool: [0] };
     p.confirmShot = !p.confirmShot;
     p.privateInfo = { round: 77, chamberIndex: 0, type: 'live', stale: true };
+    // Another player's open loots (or their absence) are invisible (decision 63).
+    p.loots = (p.loots ?? []).length > 0 ? [] : [{ victim: other.id, clockSeq: 1 }];
     if (p.ransomOffer && p.ransomOffer.to === viewerId && viewerAlive) continue; // the viewer may see it
     p.ransomOffer = p.ransomOffer ? null : { to: other.id === p.id ? p.id : other.id, kind: 'tool', tool: 'heal' };
     if (p.ransomOffer && (p.ransomOffer.to === viewerId || p.ransomOffer.to === p.id)) p.ransomOffer = null;

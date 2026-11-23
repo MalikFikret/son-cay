@@ -7,7 +7,7 @@ import { pub, priv, audit } from './events.js';
 import { chamberEffect, currentChamber, reloadIfEmpty } from './roulette.js';
 import { resolvePredictions } from './ghosts.js';
 import { closeOffer, closeOffersTo } from './jail.js';
-import { beginLoot } from './loot.js';
+import { closeLootsOf, openLoot } from './loot.js';
 import { advanceTurn, continueTurn } from './turn.js';
 
 // A shield counts only once the turn in which it was raised has ended.
@@ -71,6 +71,8 @@ function eliminate(ctx, death) {
   p.privateInfo = null;
   closeOffer(ctx, p, 'eliminated');
   closeOffersTo(ctx, p.id, 'eliminated');
+  // A looter who is out loses every loot still open (decision 63).
+  closeLootsOf(ctx, p, 'looterOut');
   s.links = s.links.filter((link) => link[0] !== p.id && link[1] !== p.id);
   pub(ctx, 'eliminated', {
     player: p.id,
@@ -83,6 +85,8 @@ function eliminate(ctx, death) {
 export function endMatch(ctx) {
   const s = ctx.state;
   const alive = alivePlayers(s);
+  // The end of the match closes every open loot; nothing is taken.
+  for (const p of s.players) closeLootsOf(ctx, p, 'matchEnded');
   for (const p of s.players) {
     if (!p.alive) {
       p.hand = [];
@@ -157,23 +161,22 @@ export function fire(ctx, shooterId, targetId, auto) {
   s.phase = { type: 'turn' };
   reloadIfEmpty(ctx);
 
-  // The credited player loots each victim, if still alive and not the victim.
-  const queue = [];
+  // The credited player loots each victim, if still alive and not the victim
+  // (decision 63: a private standing offer; the turn passes at once).
+  const loots = [];
   for (const death of outcome.deaths) {
     const victim = getPlayer(s, death.player);
     const looter = getPlayer(s, death.credit);
     if (death.credit !== death.player && looter.alive) {
-      queue.push({ looter: looter.id, victim: victim.id });
+      loots.push({ looter: looter.id, victim: victim.id });
     } else {
       victim.hand = [];
       victim.coins = 0;
     }
   }
-  if (queue.length > 0) {
-    beginLoot(ctx, queue); // the turn passes once the loot is settled
-    return;
-  }
 
   if (selfBlank) continueTurn(ctx);
   else advanceTurn(ctx);
+  // After the turn moved on: the offers start with the countdown of this write.
+  for (const loot of loots) openLoot(ctx, loot.looter, loot.victim);
 }

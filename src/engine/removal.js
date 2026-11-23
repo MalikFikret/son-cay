@@ -14,7 +14,7 @@ import { alivePlayers, getPlayer, reject } from './util.js';
 import { pub, priv } from './events.js';
 import { closeOffer, closeOffersTo } from './jail.js';
 import { endMatch } from './shot.js';
-import { dropLootsOf } from './loot.js';
+import { closeLootsOf } from './loot.js';
 import { abandonPendingTool } from './tools.js';
 import { advanceTurn } from './turn.js';
 
@@ -36,6 +36,8 @@ export function handleRemovePlayer(ctx, action) {
   p.privateInfo = null;
   closeOffer(ctx, p, 'removed');
   closeOffersTo(ctx, p.id, 'removed');
+  // Their open loots are lost; the victims' tools leave the game (decision 63).
+  closeLootsOf(ctx, p, 'looterOut');
   s.links = s.links.filter((link) => link[0] !== p.id && link[1] !== p.id);
 
   if (alivePlayers(s).length <= 1) {
@@ -44,11 +46,6 @@ export function handleRemovePlayer(ctx, action) {
   }
 
   const phase = s.phase;
-  if (phase.type === 'loot') {
-    // The turn passes when the remaining loot steps are settled.
-    dropLootsOf(ctx, p.id);
-    return;
-  }
   if (s.turn.playerId === p.id) {
     // Their pending step (aim, hand swap, steal) is abandoned and the turn
     // passes to the next living player. A pending double stays for the next shot.

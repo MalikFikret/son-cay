@@ -1,53 +1,70 @@
-// Loot after an elimination. The looter secretly sees the eliminated player's
-// tools and takes one (Custom: or coins up to the cap, chosen blind). Loot is
-// a blocking pending state with its own timer; a timeout forfeits the loot.
+// Loot after an elimination (decision 63). The player credited with a kill gets
+// a standing PRIVATE offer, like a ransom offer: it never blocks the game, the
+// turn passes at once, and several offers can be open at the same time (for
+// one looter or for several). Nobody else learns anything about it: no public
+// event, nothing in anybody else's view.
+//
+// The looter secretly sees the eliminated player's tools and takes one
+// (Custom: or coins up to the cap, chosen blind), or nothing. The offer lasts
+// LOOT_SECONDS; the engine has no clock, so the looter's own device sends the
+// expiry (a lootChoice of kind 'none' with expired: true) when the time is up.
+// Its start is the countdown that began in the same write as the kill:
+// `clockSeq` names it (the room layer knows when that countdown started).
+//
+// Whatever was not taken leaves the game when the offer closes: chosen,
+// expired, the looter eliminated or removed, or the match ended.
 
 import { ERR } from './constants.js';
 import { getPlayer, isPlainObject, reject, removeOne, requireAlivePlayer } from './util.js';
-import { pub, priv } from './events.js';
-import { advanceTurn, setClock } from './turn.js';
+import { priv } from './events.js';
 
-// queue: [{ looter, victim }, ...] in elimination order.
-export function beginLoot(ctx, queue) {
-  ctx.state.phase = { type: 'loot', queue };
-  announceHead(ctx);
+// The open offers of a player (a state stored before decision 63 has none).
+export function lootsOf(player) {
+  return Array.isArray(player.loots) ? player.loots : [];
 }
 
-function announceHead(ctx) {
+// Opens one offer. Called after the turn has moved on, so state.clock.seq is
+// the countdown that started in the same write as the kill.
+export function openLoot(ctx, looterId, victimId) {
   const s = ctx.state;
-  const head = s.phase.queue[0];
-  const victim = getPlayer(s, head.victim);
-  setClock(s, 'loot', head.looter);
-  // That a loot is happening is public by rule; its content is not.
-  pub(ctx, 'lootStarted', { looter: head.looter, victim: head.victim });
-  priv(ctx, head.looter, 'lootOffer', {
-    looter: head.looter,
-    victim: head.victim,
+  const looter = getPlayer(s, looterId);
+  const victim = getPlayer(s, victimId);
+  if (!Array.isArray(looter.loots)) looter.loots = [];
+  looter.loots.push({ victim: victim.id, clockSeq: s.clock.seq });
+  priv(ctx, looter.id, 'lootOffer', {
+    looter: looter.id,
+    victim: victim.id,
     tools: victim.hand.slice(),
     coinsOption: s.config.mode === 'custom',
+    clockSeq: s.clock.seq,
   });
 }
 
-// Closes the head entry. Whatever was not taken leaves the game.
-function finishHead(ctx, result) {
+// Closes one offer of a looter. The victim's remaining tools and coins leave the game.
+function closeLoot(ctx, looter, index, result) {
   const s = ctx.state;
-  const head = s.phase.queue.shift();
-  const victim = getPlayer(s, head.victim);
+  const [offer] = looter.loots.splice(index, 1);
+  const victim = getPlayer(s, offer.victim);
   victim.hand = [];
   victim.coins = 0;
-  priv(ctx, head.looter, 'lootResult', { looter: head.looter, victim: head.victim, ...result });
-  pub(ctx, 'lootResolved', { looter: head.looter, victim: head.victim });
-  if (s.phase.queue.length > 0) announceHead(ctx);
-  else advanceTurn(ctx);
+  priv(ctx, looter.id, 'lootResult', { looter: looter.id, victim: victim.id, ...result });
+}
+
+// Closes every open offer of a player who can no longer loot (eliminated,
+// removed) or of everybody when the match ends. Nothing is taken.
+export function closeLootsOf(ctx, player, reason) {
+  while (lootsOf(player).length > 0) {
+    closeLoot(ctx, player, 0, { taken: 'none', forfeited: true, reason });
+  }
 }
 
 export function handleLootChoice(ctx, action) {
   const s = ctx.state;
   const player = requireAlivePlayer(s, action.playerId);
-  if (s.phase.type !== 'loot') reject(ERR.WRONG_PHASE, 'there is no loot to choose right now');
-  const head = s.phase.queue[0];
-  if (head.looter !== player.id) reject(ERR.NOT_LOOTER, 'this loot is not yours');
-  const victim = getPlayer(s, head.victim);
+  const index = typeof action.victim === 'string' ? lootsOf(player).findIndex((l) => l.victim === action.victim) : -1;
+  // A late choice (the offer expired or closed) or someone else's loot.
+  if (index === -1) reject(ERR.NO_LOOT, 'you have no open loot of that player');
+  const victim = getPlayer(s, player.loots[index].victim);
   const choice = action.choice;
   if (!isPlainObject(choice)) reject(ERR.INVALID_ACTION, 'choice must be an object');
 
@@ -56,45 +73,18 @@ export function handleLootChoice(ctx, action) {
       reject(ERR.INVALID_CHOICE, 'that tool is not among the eliminated player\'s tools');
     }
     player.hand.push(choice.tool);
-    finishHead(ctx, { taken: 'tool', tool: choice.tool });
+    closeLoot(ctx, player, index, { taken: 'tool', tool: choice.tool, forfeited: false, reason: 'chosen' });
   } else if (choice.kind === 'coins') {
     if (s.config.mode !== 'custom') reject(ERR.INVALID_CHOICE, 'coins can be looted only in custom mode');
     // Chosen blind: the looter gets what is there, up to the cap.
     const amount = Math.min(victim.coins, s.config.custom.lootCoinCap);
     player.coins += amount;
-    finishHead(ctx, { taken: 'coins', amount, coins: player.coins });
+    closeLoot(ctx, player, index, { taken: 'coins', amount, coins: player.coins, forfeited: false, reason: 'chosen' });
   } else if (choice.kind === 'none') {
-    finishHead(ctx, { taken: 'none' });
+    // The looter's device sends the expiry when LOOT_SECONDS have passed.
+    const expired = action.expired === true;
+    closeLoot(ctx, player, index, { taken: 'none', forfeited: expired, reason: expired ? 'expired' : 'chosen' });
   } else {
     reject(ERR.INVALID_CHOICE, "choice.kind must be 'tool', 'coins' or 'none'");
   }
-}
-
-// A looter was removed from the match: their loot steps are dropped. The
-// victims' tools and coins leave the game. If the dropped step was the one in
-// progress, the next step starts (or, with none left, the turn passes).
-export function dropLootsOf(ctx, looterId) {
-  const s = ctx.state;
-  const queue = s.phase.queue;
-  const head = queue[0];
-  const kept = [];
-  for (const entry of queue) {
-    if (entry.looter !== looterId) {
-      kept.push(entry);
-      continue;
-    }
-    const victim = getPlayer(s, entry.victim);
-    victim.hand = [];
-    victim.coins = 0;
-  }
-  if (kept.length === queue.length) return;
-  s.phase.queue = kept;
-  if (head.looter === looterId) pub(ctx, 'lootResolved', { looter: head.looter, victim: head.victim });
-  if (kept.length === 0) advanceTurn(ctx);
-  else if (head.looter === looterId) announceHead(ctx);
-}
-
-// Timeout while a loot is pending: the looter loses this loot.
-export function forfeitLoot(ctx) {
-  finishHead(ctx, { taken: 'none', forfeited: true });
 }

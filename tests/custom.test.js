@@ -367,13 +367,13 @@ test('custom ransom: a tool still works, and an offer that can no longer be paid
 test('custom loot: the looter picks a tool as in classic, or coins up to the cap of 3', () => {
   const s0 = custom({ n: 4, chambers: 'LBBB', hp: { p2: 1 }, coins: { p2: 9 }, hands: { p2: ['heal', 'jail'] } });
   const pending = act(s0, shoot('p1', 'p2')).state;
-  assert.deepEqual(viewFor(pending, 'p1').self.pending, { type: 'loot', victim: 'p2', tools: ['heal', 'jail'], coinsOption: true });
-  const coins = act(pending, { type: 'lootChoice', playerId: 'p1', choice: { kind: 'coins' } });
+  assert.deepEqual(viewFor(pending, 'p1').self.loots, [{ victim: 'p2', tools: ['heal', 'jail'], coinsOption: true, clockSeq: pending.clock.seq }]);
+  const coins = act(pending, { type: 'lootChoice', playerId: 'p1', victim: 'p2', choice: { kind: 'coins' } });
   assert.equal(player(coins.state, 'p1').coins, 7);
   assert.deepEqual(player(coins.state, 'p1').hand, []);
   assert.equal(player(coins.state, 'p2').coins, 0, 'the rest leaves the game');
   assert.equal(one(privs(coins.events, 'lootResult')).amount, 3);
-  const tool = act(pending, { type: 'lootChoice', playerId: 'p1', choice: { kind: 'tool', tool: 'jail' } });
+  const tool = act(pending, { type: 'lootChoice', playerId: 'p1', victim: 'p2', choice: { kind: 'tool', tool: 'jail' } });
   assert.deepEqual(player(tool.state, 'p1').hand, ['jail']);
   assert.equal(player(tool.state, 'p1').coins, 4);
 });
@@ -391,7 +391,7 @@ test('custom loot: the choice is blind - less than the cap gives what is there, 
       d.players[1].coins = 99;
     });
     assert.deepEqual(viewFor(pending, 'p1'), viewFor(other, 'p1'));
-    const { state } = act(pending, { type: 'lootChoice', playerId: 'p1', choice: { kind: 'coins' } });
+    const { state } = act(pending, { type: 'lootChoice', playerId: 'p1', victim: 'p2', choice: { kind: 'coins' } });
     assert.equal(player(state, 'p1').coins, 4 + gained);
   }
 });
@@ -404,7 +404,7 @@ test('custom loot: the coin cap is a host setting', () => {
     coins: { p2: 9 },
     config: { custom: { lootCoinCap: 5 } },
   });
-  const { state } = play(s0, shoot('p1', 'p2'), { type: 'lootChoice', playerId: 'p1', choice: { kind: 'coins' } });
+  const { state } = play(s0, shoot('p1', 'p2'), { type: 'lootChoice', playerId: 'p1', victim: 'p2', choice: { kind: 'coins' } });
   assert.equal(player(state, 'p1').coins, 9);
 });
 
@@ -421,7 +421,7 @@ test('ghost: an eliminated player becomes a ghost and sees only what a spectator
     d.players[1].privateInfo = { round: 1, chamberIndex: 2, type: 'blank', stale: false };
     d.players[2].shields.shot.push(0);
   });
-  const dead = play(s0, shoot('p1', 'p2'), { type: 'lootChoice', playerId: 'p1', choice: { kind: 'none' } }).state;
+  const dead = play(s0, shoot('p1', 'p2'), { type: 'lootChoice', playerId: 'p1', victim: 'p2', choice: { kind: 'none' } }).state;
   const view = viewFor(dead, 'p2');
   assert.equal(view.role, 'ghost');
   assert.equal(view.self, null, 'what they knew while alive is removed from their screen');

@@ -139,10 +139,12 @@ export function keepTarget(current, targets) {
   return current !== null && targets.includes(current) ? current : null;
 }
 
-/** The seat the revolver points at: my chosen target (my screen only), else the current player. */
+/**
+ * The seat the revolver points at: my chosen target (my screen only), else the current player.
+ * Loot never shows here (decision 63: it is private and does not stop the game).
+ */
 export function revolverSeat({ target, view }) {
   if (target) return target;
-  if (view?.phase?.type === 'loot' && view.phase.queue?.[0]?.looter) return view.phase.queue[0].looter;
   return view?.turn?.playerId ?? null;
 }
 
@@ -172,7 +174,6 @@ export function statusText(view, nameOf) {
     if (view.result?.type === 'win') return view.result.winner === view.viewer ? TEXT.youWon : TEXT.winnerIs(nameOf(view.result.winner));
     return TEXT.drawResult;
   }
-  if (view.phase?.type === 'loot' && view.phase.queue?.[0]) return TEXT.lootOf(nameOf(view.phase.queue[0].looter));
   if (view.turn.playerId === view.viewer) return TEXT.yourTurn;
   return TEXT.turnOf(nameOf(view.turn.playerId));
 }

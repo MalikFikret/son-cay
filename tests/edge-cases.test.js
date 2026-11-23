@@ -27,7 +27,8 @@ test('Q9: with a link between target and shooter, link damage is applied before 
   const { state, events } = act(s0, shoot('p1', 'p2'));
   assert.deepEqual(hpOf(state), { p1: 0, p2: 4, p3: 5, p4: 5 });
   assert.equal(one(pubs(events, 'eliminated')).by, null);
-  assert.equal(state.phase.type, 'turn', 'nobody loots');
+  assert.equal(state.phase.type, 'turn');
+  for (const p of state.players) assert.deepEqual(p.loots, [], 'nobody loots');
   assert.deepEqual(player(state, 'p3').shields.shot, [], 'the shield is still used up');
 });
 
@@ -47,7 +48,7 @@ test('Q31: in custom, a flipped live on self acts as a blank in every respect - 
   assert.equal(state.turn.playerId, 'p1');
 });
 
-test('Q30: anytime tools remain usable during a pending loot or steal; the looter\'s own turn counter still applies', () => {
+test('Q30 (decision 63): loot never pauses the game; the turn of the looter is over, so their anytime tools are free', () => {
   const s0 = setup({
     n: 4,
     config: { toolsPerTurn: 1 },
@@ -56,17 +57,17 @@ test('Q30: anytime tools remain usable during a pending loot or steal; the loote
     hands: { p1: ['heal', 'heal'], p3: ['heal', 'shotShield'] },
   });
   const pending = act(s0, shoot('p1', 'p2')).state;
-  assert.equal(pending.phase.type, 'loot');
-  // Another player: free, as it is not their turn.
-  const other = play(pending, use('p3', 'heal'), use('p3', 'shotShield')).state;
-  assert.equal(player(other, 'p3').hp, 4);
-  // The shooter is still in their own turn while looting: the limit of 1 holds.
-  const mine = act(other, use('p1', 'heal')).state;
-  fails(mine, use('p1', 'heal'), ERR.TOOL_LIMIT_REACHED);
-  // The shield raised during the loot pause works once the turn has passed.
-  const next = act(mine, { type: 'lootChoice', playerId: 'p1', choice: { kind: 'none' } }).state;
-  assert.equal(next.turn.playerId, 'p3');
-  assert.deepEqual(viewFor(next, 'p3').self.shields.shot, [{ active: true }]);
+  assert.equal(pending.phase.type, 'turn');
+  assert.equal(pending.turn.playerId, 'p3', 'the turn passed at once');
+  // The looter, outside their own turn: anytime tools are free of the limit.
+  const looter = play(pending, use('p1', 'heal'), use('p1', 'heal')).state;
+  assert.equal(player(looter, 'p1').hp, 5);
+  // The turn player: the limit of 1 holds.
+  const mine = act(looter, use('p3', 'heal')).state;
+  fails(mine, use('p3', 'shotShield'), ERR.TOOL_LIMIT_REACHED);
+  // The loot is still open and can be chosen any time.
+  const done = act(mine, { type: 'lootChoice', playerId: 'p1', victim: 'p2', choice: { kind: 'none' } }).state;
+  assert.deepEqual(player(done, 'p1').loots, []);
 });
 
 test('Q13: the two-step hand swap counts once against the per-turn tool limit', () => {
@@ -77,17 +78,18 @@ test('Q13: the two-step hand swap counts once against the per-turn tool limit', 
 });
 
 test('Q16: a ransom offer closes when the player it was made to is eliminated', () => {
-  let s0 = setup({ n: 4, chambers: 'LBBB', hp: { p3: 1 }, hands: { p2: ['heal'] } });
+  // p4 is jailed (not next in turn: the turn passes at once to p2, decision 63).
+  let s0 = setup({ n: 4, chambers: 'LBBB', hp: { p3: 1 }, hands: { p4: ['heal'] } });
   s0 = edit(s0, (d) => {
-    d.players[1].jailed = true;
-    d.players[1].ransomOffer = { to: 'p3', kind: 'tool', tool: 'heal' };
+    d.players[3].jailed = true;
+    d.players[3].ransomOffer = { to: 'p3', kind: 'tool', tool: 'heal' };
   });
   const { state, events } = act(s0, shoot('p1', 'p3'));
-  assert.equal(player(state, 'p2').ransomOffer, null);
-  assert.equal(player(state, 'p2').jailed, true, 'still jailed: nobody accepted');
+  assert.equal(player(state, 'p4').ransomOffer, null);
+  assert.equal(player(state, 'p4').jailed, true, 'still jailed: nobody accepted');
   const closed = one(privs(events, 'ransomClosed'));
   assert.equal(closed.reason, 'eliminated');
-  assert.deepEqual(closed.to, ['p2', 'p3']);
+  assert.deepEqual(closed.to, ['p4', 'p3']);
 });
 
 test('Q18: a match that ends on the last chamber does not reload or close the round', () => {
@@ -133,7 +135,7 @@ test('Q6: a flip mark moved by a shuffle stays on its chamber and still inverts 
   assert.ok(found);
 });
 
-test('Q25: a ghost may set a prediction while a loot is pending; it applies to the next shot', () => {
+test('Q25: a ghost may set a prediction while a loot is open; it applies to the next shot', () => {
   let s0 = setup({ mode: 'custom', n: 5, chambers: 'LLBBB', hp: { p2: 1 } });
   s0 = edit(s0, (d) => {
     Object.assign(d.players[4], { alive: false, hp: 0, coins: 0, privateInfo: null });
@@ -142,7 +144,7 @@ test('Q25: a ghost may set a prediction while a loot is pending; it applies to t
   const predicted = act(pending, { type: 'predict', playerId: 'p5', prediction: 'live' }).state;
   // The newly eliminated player can predict as well.
   const both = act(predicted, { type: 'predict', playerId: 'p2', prediction: 'blank' }).state;
-  const { events } = play(both, { type: 'lootChoice', playerId: 'p1', choice: { kind: 'none' } }, shoot('p3', 'p4'));
+  const { events } = play(both, { type: 'lootChoice', playerId: 'p1', victim: 'p2', choice: { kind: 'none' } }, shoot('p3', 'p4'));
   assert.deepEqual(
     pubs(events, 'predictionResolved').map((e) => [e.player, e.correct]),
     [

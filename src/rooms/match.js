@@ -21,7 +21,7 @@
 // Like the rest of src/rooms, this module never imports Firebase: the functions come in deps.
 
 import { MAX_PLAYERS, MIN_PLAYERS, applyAction, createMatch, eventsFor, validateConfig, viewFor } from '../engine/index.js';
-import { createClockRunner } from './clock.js';
+import { createClockRunner, createLootRunner, lootDeadline, rememberClockAt } from './clock.js';
 import { ROOM_ERR, RoomError, isPermissionDenied } from './errors.js';
 import { isSeatPresent } from './host.js';
 import {
@@ -39,6 +39,7 @@ import { LOBBY_STATUS, PLAYING_STATUS, paths } from './schema.js';
 const LAYER_ONLY = ['removePlayer'];
 // A timeout for a countdown that already moved on: normal (another device was faster).
 const STALE_TIMEOUT = 'STALE_TIMEOUT';
+const NO_LOOT = 'NO_LOOT'; // the loot was already chosen or closed: a normal answer to an expiry
 // Another device that sees an ended match without results writes them after 1-3 s.
 const FINISH_DELAY_MS = 1000;
 const FINISH_JITTER_MS = 2000;
@@ -347,7 +348,10 @@ export function createMatchFunctions(ctx) {
    * countdown, schedules { type: 'timeout', seq } at the deadline (clockAt + shotTimeSeconds, in
    * server time) if the clock waits for this device's seat, or at deadline + 3 s + 0-2 s
    * otherwise, and only if the countdown has not moved on. A STALE_TIMEOUT answer is normal and
-   * is not reported. It also finishes a match that ended without results (after 1-3 s), in case
+   * is not reported. Loot (decision 63): only for this device's OWN open loots, it sends the
+   * expiry ({ type: 'lootChoice', victim, choice: { kind: 'none' }, expired: true }) at
+   * lootDeadline (the kill's countdown start + LOOT_SECONDS); a NO_LOOT answer (already chosen)
+   * is normal. Other devices see no loot in their seat's data and schedule nothing for it. It also finishes a match that ended without results (after 1-3 s), in case
    * the device that ended it could not. Separate from watchMatch, so a UI can watch without
    * sending, and every device in the room can run the clock without watching.
    * @param {{ uid: string, code: string, onError?: (error: unknown) => void }} input
@@ -366,6 +370,21 @@ export function createMatchFunctions(ctx) {
     let finishTimer = null;
     let finishFor = null;
     const unsubscribers = [];
+
+    let memory = {}; // clock.seq -> clockAt seen by this device (loot deadlines)
+    let memoryN = null;
+    const lootRunner = createLootRunner({
+      setTimeout: setTimer,
+      clearTimeout: clearTimer,
+      now,
+      onExpire(victim) {
+        transact(roomCode, seatId, { type: 'lootChoice', playerId: seatId, victim, choice: { kind: 'none' }, expired: true })
+          .then((result) => {
+            if (!result.ok && result.error.code !== NO_LOOT) report(new RoomError(ROOM_ERR.WRITE_DENIED, `loot expiry refused: ${result.error.code}`));
+          })
+          .catch(report);
+      },
+    });
 
     const runner = createClockRunner({
       setTimeout: setTimer,
@@ -394,6 +413,7 @@ export function createMatchFunctions(ctx) {
       if (stopped) return;
       stopped = true;
       runner.stop();
+      lootRunner.stop();
       if (finishTimer !== null) clearTimer(finishTimer);
       for (const unsubscribe of unsubscribers) unsubscribe();
     }
@@ -419,10 +439,19 @@ export function createMatchFunctions(ctx) {
               return;
             }
             const ended = state.status === 'ended';
+            const mySeat = playerIdIn(state, seatId);
             runner.update(
-              { ended, clock: state.clock, clockAt: value.clockAt, shotTimeSeconds: state.config.shotTimeSeconds, mySeat: playerIdIn(state, seatId) },
+              { ended, clock: state.clock, clockAt: value.clockAt, shotTimeSeconds: state.config.shotTimeSeconds, mySeat },
               offset,
             );
+            if (memoryN !== value.n) {
+              memory = {};
+              memoryN = value.n;
+            }
+            memory = rememberClockAt(memory, state.clock.seq, value.clockAt);
+            // Only my own seat's loots: a device never looks at anybody else's.
+            const me = mySeat === null ? null : state.players.find((p) => p.id === mySeat);
+            lootRunner.update({ ended, loots: me && me.alive && Array.isArray(me.loots) ? me.loots : [], memory }, offset);
             if (ended) scheduleFinish(value);
           },
           (error) => {
@@ -444,7 +473,8 @@ export function createMatchFunctions(ctx) {
    * `events` the new log entries since the previous delivery as eventsFor lets that seat see them,
    * `legalActions` the engine's legal actions of the caller's seat only ([] for a spectator),
    * `clockAt` the server time the current countdown started (deadline: clockAt +
-   * view.config.shotTimeSeconds * 1000). The first delivery of a match (the first one,
+   * view.config.shotTimeSeconds * 1000), `lootDeadlines` { [victim]: server time } for the
+   * caller's own open loots (view.self.loots; decision 63, see lootDeadline), {} otherwise. The first delivery of a match (the first one,
    * or after a new match started) has initial: true and all of its log entries. Nothing is
    * delivered while the room has no match.
    * @param {{ uid: string, code: string, onUpdate: (update: object) => void, onError?: (error: unknown) => void }} input
@@ -462,6 +492,7 @@ export function createMatchFunctions(ctx) {
     let unsubscribe = null;
     let lastN = null;
     let lastSeq = -1;
+    let memory = {}; // clock.seq -> clockAt seen by this device (loot deadlines)
 
     (async () => {
       const seatId = await currentSeat(roomCode, uid);
@@ -481,13 +512,22 @@ export function createMatchFunctions(ctx) {
           }
           const playerId = playerIdIn(state, seatId);
           const initial = value.n !== lastN;
+          if (initial) memory = {};
+          memory = rememberClockAt(memory, state.clock.seq, value.clockAt);
+          const view = viewFor(state, playerId);
+          const lootDeadlines = {};
+          for (const loot of view.self?.loots ?? []) {
+            const deadline = lootDeadline(loot, memory);
+            if (deadline !== null) lootDeadlines[loot.victim] = deadline;
+          }
           const update = {
             n: value.n,
             seq: value.seq,
-            view: viewFor(state, playerId),
+            view,
             events: eventsSince(parseLog(value.log), initial ? -1 : lastSeq, playerId),
             legalActions: legalActionsFor(state, playerId),
             clockAt: value.clockAt,
+            lootDeadlines,
             initial,
           };
           lastN = value.n;

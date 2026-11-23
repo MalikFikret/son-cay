@@ -2,7 +2,17 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { BACKUP_DELAY_MS, BACKUP_JITTER_MS, createClockRunner, planTimeout } from '../src/rooms/index.js';
+import { LOOT_SECONDS } from '../src/engine/index.js';
+import {
+  BACKUP_DELAY_MS,
+  BACKUP_JITTER_MS,
+  CLOCK_MEMORY_SIZE,
+  createClockRunner,
+  createLootRunner,
+  lootDeadline,
+  planTimeout,
+  rememberClockAt,
+} from '../src/rooms/index.js';
 
 // A fake local clock with setTimeout / clearTimeout that only move when advance() is called.
 function fakeTime(start = 1_000_000) {
@@ -139,9 +149,103 @@ test('room clock: nothing fires when the match ends or for kind none, or after s
   assert.deepEqual(two.fired, []);
 });
 
-test('room clock: the loot countdown is timed like a shot', () => {
-  const plan = planTimeout(info({ clock: { seq: 9, kind: 'loot', playerId: 's02' } }), 0);
-  assert.deepEqual(plan, { seq: 9, fireAtServerMs: 1_000_000 + SHOT * 1000, own: true });
+test('room clock: the shot clock never runs for a loot (decision 63)', () => {
+  // The engine has no 'loot' clock any more; planTimeout still times only the shot clock.
+  const plan = planTimeout(info(), 0);
+  assert.deepEqual(plan, { seq: 4, fireAtServerMs: 1_000_000 + SHOT * 1000, own: true });
   assert.equal(planTimeout(info({ clockAt: undefined }), 0), null);
   assert.equal(planTimeout(null, 0), null);
+});
+
+// --- Loot expiry (decision 63) ---------------------------------------------------------------
+
+test('loot deadline: the start of the countdown of the kill + 15 s, from what this device remembers', () => {
+  assert.equal(LOOT_SECONDS, 15);
+  let memory = {};
+  memory = rememberClockAt(memory, 7, 5_000);
+  memory = rememberClockAt(memory, 8, 9_000);
+  assert.equal(lootDeadline({ clockSeq: 7 }, memory), 5_000 + 15_000);
+  // A later value for the same countdown (the SDK's estimate corrected) replaces it.
+  memory = rememberClockAt(memory, 7, 5_200);
+  assert.equal(lootDeadline({ clockSeq: 7 }, memory), 20_200);
+  // Never seen (page reloaded, updates merged): the earliest later countdown stands in.
+  assert.equal(lootDeadline({ clockSeq: 6 }, memory), 5_200 + 15_000);
+  assert.equal(lootDeadline({ clockSeq: 9 }, memory), null);
+  assert.equal(lootDeadline({ clockSeq: 9 }, {}), null);
+  assert.equal(lootDeadline(null, memory), null);
+});
+
+test('loot deadline: the memory keeps only the latest countdowns', () => {
+  let memory = {};
+  for (let seq = 1; seq <= CLOCK_MEMORY_SIZE + 10; seq += 1) memory = rememberClockAt(memory, seq, seq * 1000);
+  assert.equal(Object.keys(memory).length, CLOCK_MEMORY_SIZE);
+  assert.equal(memory[1], undefined);
+  assert.equal(memory[CLOCK_MEMORY_SIZE + 10], (CLOCK_MEMORY_SIZE + 10) * 1000);
+  assert.equal(rememberClockAt(memory, 'x', 5), memory);
+});
+
+function lootRunner(time) {
+  const expired = [];
+  const r = createLootRunner({ ...time, onExpire: (victim) => expired.push({ victim, at: time.now() }) });
+  return { r, expired };
+}
+
+test('loot runner: the device of the looter sends the expiry exactly 15 s after the countdown of the kill started', () => {
+  const time = fakeTime(); // local = server here (offset 0)
+  const { r, expired } = lootRunner(time);
+  const memory = { 4: 1_000_000 };
+  r.update({ ended: false, loots: [{ victim: 's03', clockSeq: 4 }], memory }, 0);
+  assert.deepEqual(r.pending(), ['s03']);
+  time.advance(LOOT_SECONDS * 1000 - 1);
+  assert.deepEqual(expired, []);
+  time.advance(1);
+  assert.deepEqual(expired, [{ victim: 's03', at: 1_015_000 }]);
+});
+
+test('loot runner: the server time offset is applied; several loots each have their own timer', () => {
+  const time = fakeTime();
+  const { r, expired } = lootRunner(time);
+  const memory = { 4: 1_000_000, 5: 1_005_000 };
+  // The server is 2 s ahead of this device: everything fires 2 s earlier in local time.
+  r.update({ ended: false, loots: [{ victim: 's03', clockSeq: 4 }, { victim: 's05', clockSeq: 5 }], memory }, 2000);
+  time.advance(13_000);
+  assert.deepEqual(expired.map((e) => e.victim), ['s03']);
+  time.advance(5_000);
+  assert.deepEqual(expired.map((e) => e.victim), ['s03', 's05']);
+});
+
+test('loot runner: a loot that closes (chosen, looter out, match over) cancels its timer', () => {
+  const time = fakeTime();
+  const { r, expired } = lootRunner(time);
+  const memory = { 4: 1_000_000 };
+  r.update({ ended: false, loots: [{ victim: 's03', clockSeq: 4 }], memory }, 0);
+  r.update({ ended: false, loots: [], memory }, 0);
+  assert.deepEqual(r.pending(), []);
+  r.update({ ended: false, loots: [{ victim: 's04', clockSeq: 4 }], memory }, 0);
+  r.update({ ended: true, loots: [{ victim: 's04', clockSeq: 4 }], memory }, 0);
+  assert.deepEqual(r.pending(), []);
+  r.update({ ended: false, loots: [{ victim: 's05', clockSeq: 4 }], memory }, 0);
+  r.stop();
+  time.advance(60_000);
+  assert.deepEqual(expired, []);
+  assert.equal(time.pending(), 0);
+});
+
+test('loot runner: an expiry already due fires at once; repeated updates do not reschedule it', () => {
+  const time = fakeTime(2_000_000);
+  const { r, expired } = lootRunner(time);
+  const memory = { 4: 1_000_000 };
+  r.update({ ended: false, loots: [{ victim: 's03', clockSeq: 4 }], memory }, 0);
+  r.update({ ended: false, loots: [{ victim: 's03', clockSeq: 4 }], memory }, 0);
+  time.advance(0);
+  assert.deepEqual(expired.map((e) => e.victim), ['s03']);
+});
+
+test('loot runner: a device without loots (everybody but the looter) schedules nothing at all', () => {
+  const time = fakeTime();
+  const { r, expired } = lootRunner(time);
+  for (let i = 0; i < 5; i += 1) r.update({ ended: false, loots: [], memory: { [i]: 1_000_000 + i } }, 0);
+  assert.equal(time.pending(), 0);
+  time.advance(60_000);
+  assert.deepEqual(expired, []);
 });

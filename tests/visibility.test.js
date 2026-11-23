@@ -118,15 +118,15 @@ test('visibility: loot choices do not leak - every choice looks the same from ou
     { kind: 'tool', tool: 'jail' },
     { kind: 'coins' },
     { kind: 'none' },
-  ].map((choice) => act(pending.state, { type: 'lootChoice', playerId: 'p1', choice }));
-  const timedOut = act(pending.state, { type: 'timeout' });
+  ].map((choice) => act(pending.state, { type: 'lootChoice', playerId: 'p1', victim: 'p2', choice }));
+  // Decision 63: the expiry (sent by the looter's device) looks the same too.
+  outcomes.push(act(pending.state, { type: 'lootChoice', playerId: 'p1', victim: 'p2', choice: { kind: 'none' }, expired: true }));
   for (const o of outcomes) {
     same(pubs(o.events), pubs(outcomes[0].events), 'identical public events');
     sameForOthers(o.state, outcomes[0].state, ['p1']);
     assert.deepEqual(eventsFor(o.events, 'p2'), pubs(o.events), 'the victim learns nothing more than the public');
   }
-  // Only the timeout is distinguishable, by its public timedOut event.
-  assert.equal(pubs(timedOut.events, 'timedOut').length, 1);
+  for (const o of outcomes) assert.deepEqual(pubs(o.events), [], 'no public event at all');
   // The victim's tools were shown to the looter alone.
   const offer = privs(pending.events, 'lootOffer');
   assert.equal(offer.length, 1);
@@ -273,8 +273,6 @@ test('visibility: every public event type has a fixed field whitelist', () => {
   assert.deepEqual(Object.keys(PUBLIC_EVENT_FIELDS).sort(), [
     'eliminated',
     'jailReleased',
-    'lootResolved',
-    'lootStarted',
     'matchEnded',
     'matchStarted',
     'playerRemoved',
@@ -312,8 +310,9 @@ test('visibility: scrambling every secret a viewer must not know never changes t
         assert.ok(steps++ < 20000);
         let action = { type: 'timeout' };
         if (rnd() > 0.05) {
-          const mustAct = state.phase.type === 'loot' ? state.phase.queue[0].looter : state.turn.playerId;
-          const legal = listLegalActions(state, rnd() < 0.6 ? mustAct : pick(state.players).id);
+          const looters = state.players.filter((p) => (p.loots ?? []).length > 0);
+          const actor = looters.length > 0 && rnd() < 0.3 ? pick(looters).id : rnd() < 0.6 ? state.turn.playerId : pick(state.players).id;
+          const legal = listLegalActions(state, actor);
           if (legal.length === 0) continue;
           action = pick(legal);
         }

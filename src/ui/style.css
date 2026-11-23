@@ -2537,3 +2537,139 @@ li.tablo-row { min-height: 56px; }
 .btn-back-lobby:disabled { opacity: 0.5; cursor: default; }
 
 .end-note:empty { display: none; }
+
+/* --- Ganimet: the looter's private card (task 4.3b; approved mocks 1 and 2 of conversation 13) - */
+/* Above the hand; it never covers the table. Turquoise, never red (decision 54). */
+.loot-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.loot-card {
+  padding: 12px 14px 14px;
+  border-radius: 18px;
+  background-color: var(--surface);
+  border: 1px solid var(--accent);
+  box-shadow: 0 0 22px rgba(63, 181, 172, 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.loot-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.loot-head-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.loot-title {
+  font-family: var(--font-display);
+  font-size: 24px;
+  line-height: 1;
+  overflow-wrap: anywhere;
+}
+
+.loot-sub { font-size: 12px; color: var(--muted); }
+
+.loot-ring {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+}
+
+.loot-ring svg { display: block; }
+.loot-ring-bar { stroke: var(--accent); transition: stroke-dasharray 0.2s linear; }
+
+.loot-seconds {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.loot-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.loot-tools {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.loot-tool {
+  width: 54px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+}
+
+.loot-tool:disabled { cursor: default; opacity: 0.6; }
+.loot-tool-badge { display: flex; border-radius: 50%; }
+.loot-tool-badge .tool-icon-small { width: 46px; height: 46px; }
+
+/* The selected tool: a glowing turquoise ring. */
+.loot-tool.is-picked .loot-tool-badge {
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent), 0 0 14px rgba(63, 181, 172, 0.6);
+}
+
+.loot-tool-name {
+  font-size: 10px;
+  line-height: 1.1;
+  text-align: center;
+  color: var(--muted);
+}
+
+.loot-tool.is-picked .loot-tool-name { color: var(--text); font-weight: 600; }
+
+.btn-loot {
+  margin: 0 0 0 auto;
+  flex-shrink: 0;
+  min-width: 88px;
+  min-height: 48px;
+  padding: 0 18px;
+  border-radius: 14px;
+  font: inherit;
+  font-weight: 600;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.btn-loot-take { border: 0; background-color: var(--accent); color: var(--bg); }
+.btn-loot-ok { border: 1px solid rgba(239, 230, 214, 0.5); background: transparent; color: var(--text); font-size: 15px; }
+.btn-loot:disabled { cursor: default; background-color: var(--disabled-bg); color: var(--muted); border-color: transparent; }
+
+.loot-empty {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-self: center;
+}
+
+.loot-empty-title { font-family: var(--font-display); font-size: 20px; line-height: 1.1; }

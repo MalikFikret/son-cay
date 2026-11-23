@@ -73,7 +73,11 @@ export function toolsForMode(mode) {
 
 export const CHAMBER_TYPES = ['live', 'blank'];
 
-export const PHASES = ['turn', 'confirm', 'handSwap', 'steal', 'loot', 'ended'];
+export const PHASES = ['turn', 'confirm', 'handSwap', 'steal', 'ended'];
+
+// A loot offer lasts this long (decision 63; fixed by the design, not a setting).
+// The engine has no clock: the looter's device sends the expiry.
+export const LOOT_SECONDS = 15;
 
 export const ACTION_TYPES = [
   'chooseTarget',
@@ -115,7 +119,7 @@ export const ERR = {
   DOUBLE_ALREADY_ACTIVE: 'DOUBLE_ALREADY_ACTIVE',
   HP_FULL: 'HP_FULL',
   INVALID_CHOICE: 'INVALID_CHOICE',
-  NOT_LOOTER: 'NOT_LOOTER',
+  NO_LOOT: 'NO_LOOT',
   NOT_CUSTOM_MODE: 'NOT_CUSTOM_MODE',
   TOOL_NOT_FOR_SALE: 'TOOL_NOT_FOR_SALE',
   OUT_OF_STOCK: 'OUT_OF_STOCK',

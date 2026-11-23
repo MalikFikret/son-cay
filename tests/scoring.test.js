@@ -15,7 +15,7 @@ import {
 } from '../src/engine/index.js';
 import { setup, play, shoot, use, pubs, one, edit, deepFreeze } from './helpers.js';
 
-const loot = (playerId, kind = 'none') => ({ type: 'lootChoice', playerId, choice: { kind } });
+const loot = (playerId, victim, kind = 'none') => ({ type: 'lootChoice', playerId, victim, choice: { kind } });
 const predict = (playerId, prediction) => ({ type: 'predict', playerId, prediction });
 
 function prepared(state, { shields = {}, links = [], dead = [] } = {}) {
@@ -91,7 +91,7 @@ test('scoring table: eliminating a player = +2 (on top of the shot itself)', () 
 test('scoring table: finishing a round alive = the number of shots of that round', () => {
   // Three chambers, one of them skipped: two shots. Only p1, p3, p4 are alive at the end.
   const s0 = setup({ n: 4, chambers: 'BLB', hp: { p2: 1 }, hands: { p1: ['skip'] } });
-  const { events } = playLog(s0, use('p1', 'skip'), shoot('p1', 'p2'), loot('p1'), shoot('p3', 'p4'));
+  const { events } = playLog(s0, use('p1', 'skip'), shoot('p1', 'p2'), loot('p1', 'p2'), shoot('p3', 'p4'));
   assert.equal(one(pubs(events, 'roundEnded')).shots, 2);
   const p = scoreMatch(events).players;
   assert.equal(p.p1.rounds, 2);

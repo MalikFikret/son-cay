@@ -9,6 +9,7 @@ export {
   TOOL_INFO,
   ACTION_TYPES,
   PHASES,
+  LOOT_SECONDS,
   ERR,
   isHiddenTool,
   toolsForMode,

@@ -318,7 +318,8 @@ describe('watchMatch', () => {
         assert.equal(d.stateJson, undefined);
         assert.equal(d.state, undefined);
         assert.equal(d.log, undefined);
-        assert.deepEqual(Object.keys(d).sort(), ['clockAt', 'events', 'initial', 'legalActions', 'n', 'seq', 'view']);
+        assert.deepEqual(Object.keys(d).sort(), ['clockAt', 'events', 'initial', 'legalActions', 'lootDeadlines', 'n', 'seq', 'view']);
+        assert.deepEqual(d.lootDeadlines, {}, 'no loot of mine: nothing');
         for (const action of d.legalActions) assert.equal(action.playerId, 's02');
         // Another seat's hand is not in bob's view.
         for (const p of d.view.players) assert.equal(p.hand, undefined);

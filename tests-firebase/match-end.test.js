@@ -141,6 +141,89 @@ describe('timeouts', () => {
   });
 });
 
+// Decision 63: loot is a private offer of the looter; only the looter's device sends its expiry.
+describe('loot expiry', () => {
+  // The turn player kills the next player (1 life, a live Mermi); returns the ids involved.
+  async function killNext() {
+    await startedRoom();
+    const before = await stateOf();
+    const shooter = before.turn.playerId;
+    const order = before.players.map((p) => p.id);
+    const victim = order[(order.indexOf(shooter) + 1) % order.length];
+    await rawMove(UID[shooter], (m) => {
+      const s = JSON.parse(m.stateJson);
+      s.round.chambers[s.round.cursor] = { type: 'live', flipped: false };
+      s.round.announced = { total: s.round.chambers.length, live: s.round.chambers.filter((c) => c.type === 'live').length, blank: s.round.chambers.filter((c) => c.type === 'blank').length };
+      s.players.find((p) => p.id === victim).hp = 1;
+      s.players.find((p) => p.id === victim).hand = ['heal', 'jail'];
+      return { ...m, stateJson: JSON.stringify(s) };
+    });
+    const res = await live(UID[shooter]).submitAction({ uid: UID[shooter], code: CODE, action: { type: 'chooseTarget', target: victim } });
+    assert.equal(res.ok, true);
+    const third = order.find((id) => id !== shooter && id !== victim);
+    return { shooter, victim, third };
+  }
+
+  test('the kill opens a loot that only the looter sees; the turn passes at once', async () => {
+    const { shooter, victim, third } = await killNext();
+    const state = await stateOf();
+    assert.equal(state.turn.playerId, third);
+    assert.deepEqual(state.players.find((p) => p.id === shooter).loots, [{ victim, clockSeq: state.clock.seq }]);
+    const updates = {};
+    const stops = [shooter, third].map((seat) => live(UID[seat]).watchMatch({ uid: UID[seat], code: CODE, onUpdate: (u) => { updates[seat] = u; } }));
+    try {
+      await waitFor(async () => updates[shooter] && updates[third], { what: 'both views' });
+    } finally {
+      for (const stop of stops) stop();
+    }
+    const match = await matchOf();
+    assert.deepEqual(updates[shooter].view.self.loots.map((l) => [l.victim, l.tools]), [[victim, ['heal', 'jail']]]);
+    assert.equal(updates[shooter].lootDeadlines[victim], match.clockAt + 15000, 'the kill\'s countdown + 15 s');
+    assert.deepEqual(updates[third].view.self.loots, []);
+    assert.deepEqual(updates[third].lootDeadlines, {});
+    assert.ok(!JSON.stringify(updates[third].events).includes('loot'), 'no loot event for a third player');
+  });
+
+  test('only the looter\'s runMatchClock sends the expiry, once, at the deadline; nobody else writes', async () => {
+    const { shooter, victim } = await killNext();
+    const seqAfterKill = (await matchOf()).seq;
+    const errors = [];
+    // 20 s ahead: the loot (15 s) has expired, the shot clock (30 s, backup 33 s) has not.
+    const ahead = { now: () => Date.now() + 20000, random: () => 0 };
+    const stopOthers = Object.keys(UID).filter((seat) => seat !== shooter)
+      .map((seat) => live(UID[seat], ahead).runMatchClock({ uid: UID[seat], code: CODE, onError: (e) => errors.push(e) }));
+    await wait(1500);
+    assert.equal((await matchOf()).seq, seqAfterKill, 'other devices send nothing for a loot');
+    const stopLooter = live(UID[shooter], ahead).runMatchClock({ uid: UID[shooter], code: CODE, onError: (e) => errors.push(e) });
+    try {
+      await waitFor(async () => (await stateOf()).players.find((p) => p.id === shooter).loots.length === 0, { what: 'the loot expiry' });
+      await wait(800);
+    } finally {
+      stopLooter();
+      for (const stop of stopOthers) stop();
+    }
+    const match = await matchOf();
+    assert.equal(match.seq, seqAfterKill + 1, 'exactly one write: the expiry');
+    const entry = parseLog(match.log).find((e) => e.seq === match.seq).events;
+    assert.deepEqual(entry.map((e) => [e.type, e.visibility, e.to, e.reason]), [['lootResult', 'private', [shooter], 'expired']]);
+    const state = await stateOf();
+    assert.deepEqual(state.players.find((p) => p.id === victim).hand, [], 'the victim\'s tools left the game');
+    assert.deepEqual(state.players.find((p) => p.id === shooter).hand.filter((t) => t === 'jail'), []);
+    assert.deepEqual(errors, []);
+  });
+
+  test('a choice before the deadline closes the loot; the expiry then has nothing to do', async () => {
+    const { shooter, victim } = await killNext();
+    const res = await live(UID[shooter]).submitAction({ uid: UID[shooter], code: CODE, action: { type: 'lootChoice', victim, choice: { kind: 'tool', tool: 'jail' } } });
+    assert.equal(res.ok, true);
+    const late = await live(UID[shooter]).submitAction({ uid: UID[shooter], code: CODE, action: { type: 'lootChoice', victim, choice: { kind: 'none' }, expired: true } });
+    assert.equal(late.ok, false);
+    assert.equal(late.error.code, 'NO_LOOT');
+    const state = await stateOf();
+    assert.ok(state.players.find((p) => p.id === shooter).hand.includes('jail'));
+  });
+});
+
 describe('removeAbsentPlayer', () => {
   test('the host removes a seat whose presence is off', async () => {
     await startedRoom();

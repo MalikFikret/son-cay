@@ -139,47 +139,38 @@ test('removePlayer on a linked player: the link is dissolved and their shields a
   assert.deepEqual(hpOf(shot), { p1: 5, p2: 4, p3: 0, p4: 5 });
 });
 
-test('removePlayer on a looter with a pending loot: the loot is dropped and the turn passes', () => {
+test('removePlayer on a looter with an open loot: the loot is lost, the turn is untouched (decision 63)', () => {
   const s0 = setup({ n: 4, chambers: 'LBBB', hp: { p2: 1 }, hands: { p1: ['probe'], p2: ['heal', 'jail'] } });
   const pending = act(s0, shoot('p1', 'p2')).state;
-  assert.deepEqual(pending.phase.queue, [{ looter: 'p1', victim: 'p2' }]);
+  assert.deepEqual(player(pending, 'p1').loots.map((l) => l.victim), ['p2']);
+  assert.equal(pending.turn.playerId, 'p3');
   const { state, events } = act(pending, remove('p1'));
   assert.deepEqual(state.phase, { type: 'turn' });
   assert.equal(state.turn.playerId, 'p3');
+  assert.equal(state.clock.seq, pending.clock.seq, 'not the turn of p1: the clock does not move');
   for (const p of state.players) {
-    if (p.alive) assert.deepEqual(p.hand, [], 'nobody received the victim\'s or the looter\'s tools');
+    if (p.alive) assert.deepEqual(p.hand, [], 'nobody received the tools of the victim or the looter');
   }
   assert.deepEqual(player(state, 'p2').hand, []);
-  assert.deepEqual(
-    pubs(events).map((e) => e.type),
-    ['playerRemoved', 'lootResolved', 'turnStarted'],
-  );
+  assert.deepEqual(player(state, 'p1').loots, []);
+  assert.deepEqual(pubs(events).map((e) => e.type), ['playerRemoved']);
+  assert.equal(one(privs(events, 'lootResult')).reason, 'looterOut');
 });
 
-test('removePlayer on a looter: their later loot steps are dropped, other looters keep theirs', () => {
-  // A loot queue with one step for p3 (in progress) and two later steps for p1, built directly.
+test('removePlayer on a looter: only their loots are lost, other looters keep theirs', () => {
   let s0 = setup({ n: 6, chambers: 'LBBBBB', hands: { p4: ['heal'], p5: ['jail'], p6: ['link'] } });
   s0 = edit(s0, (d) => {
     for (const id of ['p4', 'p5', 'p6']) Object.assign(d.players.find((p) => p.id === id), { alive: false, hp: 0 });
-    d.phase = {
-      type: 'loot',
-      queue: [
-        { looter: 'p3', victim: 'p4' },
-        { looter: 'p1', victim: 'p5' },
-        { looter: 'p1', victim: 'p6' },
-      ],
-    };
-    d.clock = { seq: d.clock.seq + 1, kind: 'loot', playerId: 'p3' };
+    d.players.find((p) => p.id === 'p3').loots = [{ victim: 'p4', clockSeq: d.clock.seq }];
+    d.players.find((p) => p.id === 'p1').loots = [{ victim: 'p5', clockSeq: d.clock.seq }, { victim: 'p6', clockSeq: d.clock.seq }];
   });
   const { state, events } = act(s0, remove('p1'));
-  assert.deepEqual(state.phase.queue, [{ looter: 'p3', victim: 'p4' }], 'the step in progress is untouched');
-  assert.equal(state.clock.seq, s0.clock.seq);
-  assert.equal(pubs(events, 'lootResolved').length, 0);
+  assert.deepEqual(player(state, 'p3').loots, [{ victim: 'p4', clockSeq: s0.clock.seq }], 'the other looter keeps theirs');
+  assert.equal(privs(events, 'lootResult').length, 2);
   assert.deepEqual(player(state, 'p5').hand, []);
   assert.deepEqual(player(state, 'p6').hand, []);
-  const done = act(state, { type: 'lootChoice', playerId: 'p3', choice: { kind: 'tool', tool: 'heal' } }).state;
+  const done = act(state, { type: 'lootChoice', playerId: 'p3', victim: 'p4', choice: { kind: 'tool', tool: 'heal' } }).state;
   assert.deepEqual(player(done, 'p3').hand, ['heal']);
-  assert.equal(done.phase.type, 'turn');
 });
 
 test('removePlayer on the second-to-last player: the match ends with a win and the normal win bonus', () => {
@@ -217,8 +208,8 @@ test('removePlayer is rejected for an eliminated or unknown player, or a missing
 test('removed player gets no loot given to anyone and no elimination points for anyone', () => {
   const s0 = setup({ n: 4, chambers: 'LBBB', hands: { p1: ['probe'], p2: ['heal', 'jail'], p3: ['link'] } });
   const { state, events } = act(s0, remove('p2'));
-  assert.equal(state.phase.type, 'turn', 'no loot step');
-  assert.equal(pubs(events, 'lootStarted').length, 0);
+  assert.equal(state.phase.type, 'turn');
+  for (const p of state.players) assert.deepEqual(p.loots, [], 'no loot for anyone');
   assert.equal(pubs(events, 'eliminated').length, 0, 'nobody is credited');
   assert.deepEqual(player(state, 'p1').hand, ['probe']);
   assert.deepEqual(player(state, 'p3').hand, ['link']);
