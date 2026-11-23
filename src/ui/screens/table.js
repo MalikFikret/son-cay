@@ -30,6 +30,7 @@
 
 import { h, svg } from '../dom.js';
 import { ICONS, errorLine } from '../components.js';
+import { createCloseRoom } from '../close-room.js';
 import { TEXT, errorMessage } from '../messages.js';
 import { MODE_LABELS } from '../lobby-model.js';
 import { createSheet } from '../sheet.js';
@@ -110,10 +111,12 @@ const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(pre
  *   watchServerOffset?: (fn: (offset: number) => void) => () => void,
  *   onLost: (error: object) => void, onBack: () => void }} options
  *   onLost: this device lost its seat (SEAT_LOST / NOT_MEMBER / ROOM_NOT_FOUND);
- *   onBack: "Salona dön" was pressed on the end screen
+ *   onBack: "Salona dön" was pressed on the end screen;
+ *   onCloseRoom: the host confirmed "Masayı kapat" (decision Q67; shown to the host only, enabled
+ *   during a match only while every other seat is absent: setRoom's closeRoom state)
  * @returns {{ el: HTMLElement, setRoom(room: object): void, isEnded(): boolean, destroy(): void }}
  */
-export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, onLost, onBack }) {
+export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, onLost, onBack, onCloseRoom }) {
   let destroyed = false;
   const stops = [];
   const timers = new Set();
@@ -233,9 +236,11 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
   const fireButton = h('button', { type: 'button', class: 'fire-button' }, fireMain, fireSub);
   const fireWrap = h('div', { class: 'fire-wrap', hidden: true }, fireButton);
 
+  const closeControl = createCloseRoom({ id: 'table-close', onConfirm: () => (onCloseRoom ? onCloseRoom() : null) });
+
   const tableView = h('div', { class: 'table-view' },
     topBar, stage,
-    h('div', { class: 'table-lower' }, status, effects, errors.el, noteLine, lootWrap, ransomWrap, ransomBar, hand, strip, stepBar, fireWrap),
+    h('div', { class: 'table-lower' }, status, effects, errors.el, noteLine, lootWrap, ransomWrap, ransomBar, hand, strip, stepBar, fireWrap, closeControl.el),
     reloadLive2);
 
   // End screen (filled when the match is over).
@@ -1315,6 +1320,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
      * status "lobby" means the result is stored and "Salona dön" can be used.
      */
     setRoom(room) {
+      closeControl.update(room.closeRoom ?? { visible: false, enabled: false, hint: null });
       names = room.names ?? {};
       presence = room.presence ?? {};
       hostSeat = room.hostSeat ?? null;

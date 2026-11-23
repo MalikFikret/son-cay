@@ -11,6 +11,10 @@
 // room; presence and the host watcher keep running underneath. When the match ends, the table
 // shows its end screen until the player presses "Salona dön"; if the host starts the next match
 // while a player is still on it, that player goes straight to the new table.
+//
+// The host can close the table ("Masayı kapat", decision Q67): always between matches, during a
+// match only while every other seat is absent (the table screen shows the control then). When
+// the table is closed, every other device shows "Masa kapatıldı" and then Giriş.
 
 import { h } from '../dom.js';
 import { copyText, errorLine, icon, screen } from '../components.js';
@@ -22,6 +26,7 @@ import {
   STEPPED_SETTINGS,
   canStep,
   canToggleTool,
+  closeRoomState,
   defaultsFor,
   formatPoints,
   normalizeSettings,
@@ -34,6 +39,7 @@ import {
   toolCounter,
   toolList,
 } from '../lobby-model.js';
+import { createCloseRoom } from '../close-room.js';
 import { createSettingsSync } from '../settings-sync.js';
 import { toolIcon } from '../tools.js';
 import { createOptionsSheet, createSeatOrderSheet, createStartSheet } from '../lobby-sheets.js';
@@ -44,7 +50,7 @@ import { ROOM_ERR } from '../../rooms/index.js';
 const LOST_CODES = [ROOM_ERR.SEAT_LOST, ROOM_ERR.NOT_MEMBER, ROOM_ERR.ROOM_NOT_FOUND];
 
 /**
- * @param {object} ctx  { api, uid, go, goHome(message), forgetTable(), refresh(message) }
+ * @param {object} ctx  { api, uid, go, goHome(message), roomClosed(code), forgetTable(), refresh(message) }
  * @param {object} view { active(), onLeave(fn) }
  * @param {{ code: string, mine: { seatId: string }, message?: string }} params
  */
@@ -99,12 +105,14 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
     settingsBody,
     settingsError.el);
 
+  const closeControl = createCloseRoom({ id: 'lobby-close', onConfirm: closeRoom });
+
   const pageError = errorLine('lobby-error');
   if (message) pageError.show(message);
 
   const loadingLine = h('p', { class: 'loading', role: 'status', text: 'Yükleniyor…' });
   const body = h('div', { class: 'stack lobby-body', hidden: true },
-    pageError.el, codeCard, playersSection, settingsSection);
+    pageError.el, codeCard, playersSection, settingsSection, closeControl.el);
   const bottom = h('div', { class: 'lobby-bottom' });
 
   const confirmDialog = buildLeaveDialog();
@@ -159,14 +167,27 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
     stopAll();
   });
 
-  // Seat lost (kicked, recovered on another device, room gone): back to Giriş.
+  // Seat lost (kicked, recovered on another device) -> Giriş with the message; the table was
+  // closed (or its last player left) -> "Masa kapatıldı", then Giriş. A closed table can first
+  // show up as a revoked listener (SEAT_LOST / NOT_MEMBER), so the room itself is checked.
   function onLiveError(error) {
     if (ended || leaving || !view.active()) return;
     if (LOST_CODES.includes(error?.code)) {
       ended = true;
       stopAll();
       ctx.forgetTable();
-      ctx.goHome(errorMessage(error?.code === ROOM_ERR.ROOM_NOT_FOUND ? ROOM_ERR.ROOM_NOT_FOUND : ROOM_ERR.SEAT_LOST));
+      if (error?.code === ROOM_ERR.ROOM_NOT_FOUND) {
+        ctx.roomClosed(code);
+        return;
+      }
+      ctx.api.getRoomSummary({ uid: ctx.uid, code }).then(
+        () => { if (view.active()) ctx.goHome(errorMessage(ROOM_ERR.SEAT_LOST)); },
+        (failure) => {
+          if (!view.active()) return;
+          if (failure?.code === ROOM_ERR.ROOM_NOT_FOUND) ctx.roomClosed(code);
+          else ctx.goHome(errorMessage(ROOM_ERR.SEAT_LOST));
+        },
+      );
       return;
     }
     // Anything else (e.g. a refused presence write while offline): show it, keep going.
@@ -206,9 +227,12 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
     // A new match started while this player was still on the last one's end screen.
     if (playing && table && tableSawLobby) closeTable();
     if (playing && !table) openTable(next);
+    const closeState = closeRoomState({ mySeat, hostSeat: next.meta.hostSeat, status: next.meta.status, seats: next.seats, presence: next.presence });
+    closeControl.update(closeState);
     if (table) {
       if (!playing) tableSawLobby = true;
       table.setRoom({
+        closeRoom: closeState,
         names: Object.fromEntries(rows.map((row) => [row.seatId, row.name])),
         presence: next.presence,
         hostSeat: next.meta.hostSeat,
@@ -443,6 +467,7 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
       watchServerOffset: ctx.watchServerOffset,
       onLost: onLiveError,
       onBack: backToLobby,
+      onCloseRoom: closeRoom,
     });
     tableSawLobby = false;
     lobbyPart.hidden = true;
@@ -545,6 +570,35 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
     stopAll();
     ctx.forgetTable();
     if (view.active()) ctx.goHome();
+  }
+
+  // --- Closing the table (host, decision Q67) --------------------------------------------------
+  // deleteRoom stops this device's presence and host watcher before the one write, so nothing of
+  // this device writes into the deleted room. Resolves to an error text for the control, or null.
+  async function closeRoom() {
+    if (leaving || ended) return null;
+    leaving = true;
+    try {
+      await ctx.api.deleteRoom({ uid: ctx.uid, code });
+    } catch (failure) {
+      leaving = false;
+      if (!view.active()) return null;
+      ended = true;
+      stopAll();
+      if (failure?.code === ROOM_ERR.ROOM_NOT_FOUND) {
+        ctx.forgetTable();
+        ctx.goHome(TEXT.roomClosed);
+        return null;
+      }
+      // Presence may already be stopped: draw the screen again, with the message.
+      ctx.refresh(errorMessage(failure));
+      return null;
+    }
+    ended = true;
+    stopAll();
+    ctx.forgetTable();
+    if (view.active()) ctx.goHome(TEXT.roomClosedByMe);
+    return null;
   }
 
   start();

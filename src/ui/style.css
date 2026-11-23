@@ -2728,3 +2728,59 @@ li.tablo-row { min-height: 56px; }
 }
 
 .ransom-player.is-chosen { border: 2px solid var(--accent); }
+
+/* --- Masayı kapat (decision Q67): low emphasis, never red (decision 54) ------------------- */
+
+.close-room {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line-faint);
+}
+
+.btn-close-room {
+  align-self: flex-start;
+  min-height: 44px;
+  margin: 0;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(240, 138, 126, 0.4);
+  background: transparent;
+  color: var(--error);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.btn-close-room:disabled {
+  border-color: var(--line-soft);
+  color: var(--muted);
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.close-room-confirm {
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(240, 138, 126, 0.4);
+  background-color: var(--surface);
+}
+
+.close-room-confirm .muted { margin: 6px 0 0; font-size: 13px; line-height: 1.45; }
+.close-room-confirm .dialog-actions { margin-top: 14px; }
+
+.close-room-title {
+  margin: 0;
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.btn-close-yes {
+  background: transparent;
+  border: 1px solid var(--error);
+  color: var(--error);
+}
+
+.btn-close-yes:disabled { opacity: 0.6; cursor: default; }

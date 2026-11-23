@@ -1,10 +1,17 @@
 // rooms/$code itself, and the order of its children.
 //
 // There is no .read at this level (a read grant would cascade to secrets/ and claims/). The only
-// .write here deletes the whole room: the last seated player, between matches. It requires the
-// room to be gone after the write, so it never grants anything else below it.
+// .write here deletes the whole room: the last seated player between matches, or the current host
+// at any time (decision Q67; the UI alone limits it during a match to rooms where every other seat
+// is absent, rules cannot iterate presence). Both require the room to be gone after the write, so
+// they never grant anything else below it.
+//
+// .validate: nothing can exist under rooms/$code without meta. Once a room is deleted, a late
+// write (another device's onDisconnect presence write, a claim, a members entry, a match clock
+// write) cannot recreate a partial room; creation writes meta in the same update, so it still
+// works. Validation is not run for a deletion (newData null), so deleting the room is unaffected.
 
-import { CODE_OK, REFUSE, SEAT_IDS, SIGNED_IN, all, either, isMember, memberEntry } from './helpers.js';
+import { CODE_OK, IS_HOST, REFUSE, SEAT_IDS, SIGNED_IN, all, anyOf, either, isMember, memberEntry } from './helpers.js';
 import { claimsRules } from './claims.js';
 import { matchRules } from './match.js';
 import { membersRules } from './members.js';
@@ -32,9 +39,13 @@ const DELETE_ROOM = all(
   ONLY_SEAT_LEFT,
 );
 
+// The current host (a valid member on meta.hostSeat, judged before the write) deletes the room.
+const HOST_DELETES_ROOM = all(SIGNED_IN, CODE_OK, '!newData.exists()', IS_HOST);
+
 export function roomRules() {
   return {
-    '.write': DELETE_ROOM,
+    '.write': anyOf(DELETE_ROOM, HOST_DELETES_ROOM),
+    '.validate': "newData.child('meta').exists()",
     meta: metaRules(),
     settings: settingsRules(),
     seats: seatsRules(),

@@ -20,6 +20,7 @@ import {
 
 // A non-member claims an occupied seat for themselves, at most once per seat every 2 s.
 const CLAIM = all(
+  `${ROOM_BEFORE}.child('meta').exists()`,
   `${ROOM_BEFORE}.child('seats').child($seatId).exists()`,
   "newData.child('uid').val() === auth.uid",
   isNotMember(ROOM_BEFORE),

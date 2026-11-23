@@ -2,7 +2,8 @@
 // of the current hash route and follows hash changes.
 //
 // On page load: if this tab remembers a table code and the signed-in user still holds a seat
-// there, the tab goes straight back to that table; otherwise the code is forgotten.
+// there, the tab goes straight back to that table; otherwise the code is forgotten (and if that
+// table was closed, its "Masa kapatıldı" notice is shown first).
 
 import { replace } from './dom.js';
 import { loading, screen } from './components.js';
@@ -11,6 +12,7 @@ import { forgetCode, rememberCode, rememberedCode } from './memory.js';
 import { FORM_MESSAGES, errorMessage } from './messages.js';
 import { ROUTES, hashFor, parseRoute } from './routes.js';
 import { aboutScreen } from './screens/about.js';
+import { ROOM_CLOSED_MS, closedScreen } from './screens/closed.js';
 import { homeScreen } from './screens/home.js';
 import { problemScreen } from './screens/problem.js';
 import { recoverScreen } from './screens/recover.js';
@@ -43,6 +45,10 @@ const ctx = {
   /** Back to Giriş, with an optional message there. */
   goHome(message) {
     goHome(message);
+  },
+  /** The table was closed (decision Q67): "Masa kapatıldı" for a few seconds, then Giriş. */
+  roomClosed(code) {
+    showRoomClosed(code);
   },
   /** This tab no longer holds a seat at its remembered table. */
   forgetTable() {
@@ -88,6 +94,18 @@ function goHome(message) {
   ctx.go(hashFor.home(), { replace: true });
 }
 
+// "Masa kapatıldı" for ROOM_CLOSED_MS, then Giriş (at once with the button). The remembered
+// table code is forgotten if it is this table's.
+function showRoomClosed(code) {
+  if (rememberedCode() === code) forgetCode();
+  const view = startView();
+  show(closedScreen({ code, onHome: () => { if (view.active()) goHome(); } }), 'masa kapatıldı');
+  const timer = setTimeout(() => {
+    if (view.active()) goHome();
+  }, ROOM_CLOSED_MS);
+  view.onLeave(() => clearTimeout(timer));
+}
+
 function tableProblem(code, failure) {
   const notFound = failure?.code === ROOM_ERR.ROOM_NOT_FOUND;
   show(problemScreen({
@@ -116,7 +134,10 @@ async function showTable(view, code) {
     const summary = await ctx.api.getRoomSummary({ uid: ctx.uid, code });
     if (view.active()) show(sitScreen(ctx, view, { summary }), 'masaya otur');
   } catch (failure) {
-    if (view.active()) tableProblem(code, failure);
+    if (!view.active()) return;
+    // The table no longer exists (closed by its host, or its last player left).
+    if (failure?.code === ROOM_ERR.ROOM_NOT_FOUND) showRoomClosed(code);
+    else tableProblem(code, failure);
   }
 }
 
@@ -133,7 +154,9 @@ async function showRecover(view, code) {
     const summary = await ctx.api.getRoomSummary({ uid: ctx.uid, code });
     if (view.active()) show(recoverScreen(ctx, view, { summary }), 'yerine dön');
   } catch (failure) {
-    if (view.active()) tableProblem(code, failure);
+    if (!view.active()) return;
+    if (failure?.code === ROOM_ERR.ROOM_NOT_FOUND) showRoomClosed(code);
+    else tableProblem(code, failure);
   }
 }
 
@@ -186,13 +209,23 @@ async function restoreRememberedTable() {
   } catch {
     return; // Unknown (e.g. offline): keep the code, the table route will report the problem.
   }
+  const asked = parseRoute(location.hash);
+  const home = [ROUTES.HOME, ROUTES.UNKNOWN, ROUTES.BAD_CODE].includes(asked.name);
   if (mine === null) {
     forgetCode();
+    // The remembered table was closed: its route shows "Masa kapatıldı", then Giriş.
+    if (home && (await roomGone(code))) history.replaceState(null, '', hashFor.table(code));
     return;
   }
-  const asked = parseRoute(location.hash);
-  if ([ROUTES.HOME, ROUTES.UNKNOWN, ROUTES.BAD_CODE].includes(asked.name)) {
-    history.replaceState(null, '', hashFor.table(code));
+  if (home) history.replaceState(null, '', hashFor.table(code));
+}
+
+async function roomGone(code) {
+  try {
+    await ctx.api.getRoomSummary({ uid: ctx.uid, code });
+    return false;
+  } catch (failure) {
+    return failure?.code === ROOM_ERR.ROOM_NOT_FOUND;
   }
 }
 

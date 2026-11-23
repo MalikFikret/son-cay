@@ -31,8 +31,10 @@ const KICK = all('data.exists()', 'data.isString()', deletedByKick('data.val()',
 const DELETE_OWN_STALE = all('!newData.exists()', 'data.exists()', `${uidBefore('data.val()')} !== auth.uid`);
 
 // Create your entry, or replace your stale one: only to a seat that the same write gives you
-// (a newly taken seat, or a recovered one).
+// (a newly taken seat, or a recovered one), in a room that has meta after the write (a new room
+// writes its meta in the same update; a deleted room has none).
 const SET_OWN = all(
+  `${NEW_ROOM_FROM_DEPTH_2}.child('meta').exists()`,
   either('!data.exists()', `${uidBefore('data.val()')} !== auth.uid`),
   'newData.isString()',
   isSeatId('newData.val()'),

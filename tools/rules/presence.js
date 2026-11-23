@@ -18,7 +18,9 @@ import {
   sitsOn,
 } from './helpers.js';
 
-const OWN_SEAT = all(SIGNED_IN, CODE_OK, isSeatId('$seatId'));
+// The room must exist before the write (meta), so a late onDisconnect write of another device
+// can never touch a deleted room.
+const OWN_SEAT = all(SIGNED_IN, CODE_OK, `${ROOM_BEFORE}.child('meta').exists()`, isSeatId('$seatId'));
 
 export function presenceRules() {
   return {

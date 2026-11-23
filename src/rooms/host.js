@@ -44,6 +44,25 @@ export function isHostAbsentLongEnough(entry, joinedAt, serverNow) {
 }
 
 /**
+ * True if every seat other than `mySeat` is absent (no connection), e.g. so the host may close
+ * the room during a match (decision Q67). Seats are the room's seats object (seatId -> seat);
+ * waiting and eliminated seats count too: closing the room removes everyone in it. With no other
+ * seat the answer is true.
+ * @param {unknown} seats seats/ of the room
+ * @param {unknown} presence presence/ of the room
+ * @param {string} mySeat
+ * @returns {boolean}
+ */
+export function othersAbsent(seats, presence, mySeat) {
+  if (seats === null || typeof seats !== 'object') return true;
+  const entries = presence !== null && typeof presence === 'object' ? presence : {};
+  return Object.keys(seats).every((seatId) => {
+    if (seatId === mySeat || seats[seatId] === null || seats[seatId] === undefined) return true;
+    return !isSeatPresent(Object.prototype.hasOwnProperty.call(entries, seatId) ? entries[seatId] : null);
+  });
+}
+
+/**
  * Picks the new host among candidate seats. Without scores the choice is uniformly random.
  * With scores (seatId -> number) the highest score wins and ties are broken uniformly at
  * random; a candidate without a numeric score ranks below every scored one.

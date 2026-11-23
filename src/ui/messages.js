@@ -84,6 +84,18 @@ export const RETRY_WAIT_SECONDS = 2;
  * suffixes depend on the name, so the texts say "adlı oyuncu" instead.
  */
 export const TEXT = Object.freeze({
+  // Closing the table (decision Q67)
+  closeRoom: 'Masayı kapat',
+  closeRoomTitle: 'Masa kapatılsın mı?',
+  closeRoomNote: 'Masa herkes için kapanır: oyuncular, maç ve oturum puanları silinir. Geri alınamaz.',
+  closeRoomYes: 'Evet, kapat',
+  closingRoom: 'Kapatılıyor…',
+  closeRoomLocked: 'Maç bitince açılır.',
+  closeRoomAllAbsent: 'Diğer oyuncuların bağlantısı yok; masayı kapatabilirsin.',
+  roomClosed: 'Masa kapatıldı.',
+  roomClosedSub: 'Birazdan ana sayfaya dönüyorsun.',
+  roomClosedByMe: 'Masayı kapattın.',
+  toHome: 'Ana sayfaya dön',
   // Seat order
   seatOrderRandom: 'Oturma sırası: rastgele',
   seatOrderManual: 'Oturma sırası: elle',

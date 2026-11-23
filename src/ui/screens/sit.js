@@ -71,6 +71,12 @@ export function sitScreen(ctx, view, { summary } = {}) {
       });
     } catch (failure) {
       if (!view.active()) return;
+      if (joining && failure?.code === ROOM_ERR.ROOM_NOT_FOUND) {
+        // The table was closed meanwhile.
+        pin.input.value = '';
+        ctx.roomClosed(summary.code);
+        return;
+      }
       if (failure?.code === ROOM_ERR.NAME_TAKEN || failure?.code === ROOM_ERR.INVALID_NAME) {
         fail(nameError, name.input, errorMessage(failure));
       } else if (failure?.code === ROOM_ERR.INVALID_PIN) {

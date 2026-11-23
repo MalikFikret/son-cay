@@ -246,9 +246,9 @@ describe('rules: leaving', () => {
     assertValidRoom(await dumpRoom());
   });
 
-  test('the room cannot be deleted while another seat exists, nor partly', async () => {
+  test('a non-host cannot delete the room while another seat exists, nobody deletes it partly', async () => {
+    // The host may close the room at any time (decision Q67, tests-firebase/close.test.js).
     await seedRoom(['bob']);
-    await assertFails(deleteRoom('host'));
     await assertFails(deleteRoom('bob'));
     for (const child of ['meta', 'settings', 'seats', 'members', 'secrets']) {
       await assertFails(rt.userDb('host').ref(`rooms/${CODE}/${child}`).remove());
@@ -259,7 +259,7 @@ describe('rules: leaving', () => {
     assert.equal(await dumpRoom(), null);
   });
 
-  test('no leave and no room deletion while a match is running (status is not lobby)', async () => {
+  test('no leave while a match is running (status is not lobby); the host may still close the room (Q67)', async () => {
     await seedRoom(['bob']);
     await setStatus('playing');
     await assertFails(write(rt.userDb('bob'), leaveUpdate('bob', 's02')));
@@ -267,9 +267,8 @@ describe('rules: leaving', () => {
     await rt.env.clearDatabase();
     await seedRoom();
     await setStatus('playing');
-    await assertFails(deleteRoom('host'));
-    await setStatus('lobby');
     await assertSucceeds(deleteRoom('host'));
+    assert.equal(await dumpRoom(), null);
   });
 });
 
@@ -320,10 +319,12 @@ describe('leaving: concurrency', () => {
       assert.equal(leave.status, 'fulfilled', String(leave.reason));
       const room = await dumpRoom();
       if (room === null) {
-        assert.equal(join.status, 'rejected');
-        assert.equal(join.reason.code, ROOM_ERR.ROOM_NOT_FOUND);
+        // Since decision Q67 the host (the last player is always the host) may delete the room
+        // even with another seat in it, so the join may also have landed just before the
+        // deletion: its device then finds the room closed, like any other seat of a closed room.
+        if (join.status === 'rejected') assert.equal(join.reason.code, ROOM_ERR.ROOM_NOT_FOUND);
         assert.deepEqual(leave.value, { deletedRoom: true, hostSeat: null });
-        outcomes.add('deleted');
+        outcomes.add(join.status === 'rejected' ? 'deleted' : 'deleted after the join');
       } else {
         assert.equal(join.status, 'fulfilled', String(join.reason));
         assert.equal(room.meta.hostSeat, join.value.seatId);

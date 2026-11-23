@@ -3,7 +3,8 @@
 // validateConfig, toolsForMode), never from copies. Tool names and icons live in tools.js.
 
 import { CONFIG_LIMITS, MIN_PLAYERS, TOOL_IDS, defaultConfig, toolsForMode, validateConfig } from '../engine/index.js';
-import { isSeatPresent, orderSeats } from '../rooms/index.js';
+import { isSeatPresent, orderSeats, othersAbsent } from '../rooms/index.js';
+import { TEXT } from './messages.js';
 import { toolName } from './tools.js';
 
 /** The general settings with − / + buttons, in the order of the design. */
@@ -168,4 +169,20 @@ export function playerOptions(row, { mySeat, hostSeat, inLobby }) {
 /** Can the host start, and who is absent (shown before starting). */
 export function startCheck(rows) {
   return { canStart: rows.length >= MIN_PLAYERS, absent: rows.filter((row) => !row.present) };
+}
+
+/**
+ * "Masayı kapat" (decision Q67): shown to the current host only. Between matches it is always
+ * enabled; during a match only while every other seat is absent (othersAbsent), else disabled
+ * with a hint that it unlocks when the match ends. This condition is the UI's alone: the rules
+ * let the host delete the room at any time.
+ * @param {{ mySeat: string, hostSeat: string | null, status: string, seats: object | null,
+ *   presence: object | null }} room
+ * @returns {{ visible: boolean, enabled: boolean, hint: string | null }}
+ */
+export function closeRoomState({ mySeat, hostSeat, status, seats, presence }) {
+  if (typeof mySeat !== 'string' || mySeat !== hostSeat) return { visible: false, enabled: false, hint: null };
+  if (status !== 'playing') return { visible: true, enabled: true, hint: null };
+  const free = othersAbsent(seats, presence, mySeat);
+  return { visible: true, enabled: free, hint: free ? TEXT.closeRoomAllAbsent : TEXT.closeRoomLocked };
 }

@@ -18,6 +18,7 @@ import { defaultConfig } from '../engine/index.js';
 import { generateRoomCode, normalizeRoomCode } from './code.js';
 import { ROOM_ERR, RoomError, isPermissionDenied } from './errors.js';
 import { createPresenceFunctions } from './presence.js';
+import { createCloseFunction } from './close.js';
 import { createLeaveFunction } from './leave.js';
 import { createManageFunctions } from './manage.js';
 import { createSettingsFunctions } from './settings.js';
@@ -66,7 +67,7 @@ const DEFAULT_MAX_CODE_ATTEMPTS = 10;
 
 /**
  * Creates the room API bound to one database instance. The original five deps are enough for
- * createRoom, joinRoom, listSeatNames, getRoomSummary, getMySeat, recoverSeat, leaveRoom, renameSeat, kickSeat, updateSettings, setSeatOrder, clearSeatOrder and getLastMatch; presence and host functions also need
+ * createRoom, joinRoom, listSeatNames, getRoomSummary, getMySeat, recoverSeat, leaveRoom, deleteRoom, renameSeat, kickSeat, updateSettings, setSeatOrder, clearSeatOrder and getLastMatch; presence and host functions also need
  * onValue (and onDisconnect for startPresence) and throw INVALID_DEPENDENCIES without them.
  * @param {RoomApiDeps} deps
  */
@@ -463,6 +464,8 @@ export function createRoomApi(deps) {
     stopLiveFor,
   });
 
+  const deleteRoom = createCloseFunction({ read, writeAll, requireUid, requireCode, currentSeat, stopLiveFor });
+
   return {
     createRoom,
     joinRoom,
@@ -472,6 +475,7 @@ export function createRoomApi(deps) {
     recoverSeat,
     ...presenceFunctions,
     leaveRoom,
+    deleteRoom,
     renameSeat,
     kickSeat,
     updateSettings,

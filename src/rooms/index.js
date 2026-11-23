@@ -30,7 +30,7 @@ export {
 } from './clock.js';
 export { CODE_ALPHABET, CODE_LENGTH, generateRoomCode, isValidRoomCode, normalizeRoomCode } from './code.js';
 export { ROOM_ERR, RoomError, isPermissionDenied } from './errors.js';
-export { HOST_ABSENCE_MS, absentSince, chooseNewHost, isHostAbsentLongEnough, isSeatPresent } from './host.js';
+export { HOST_ABSENCE_MS, absentSince, chooseNewHost, isHostAbsentLongEnough, isSeatPresent, othersAbsent } from './host.js';
 export {
   HOST_SEAT,
   LOBBY_STATUS,

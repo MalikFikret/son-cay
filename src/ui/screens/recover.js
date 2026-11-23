@@ -83,6 +83,12 @@ export function recoverScreen(ctx, view, { summary }) {
       await ctx.api.recoverSeat({ uid: ctx.uid, code: summary.code, seatId, pin: pin.input.value });
     } catch (failure) {
       if (!view.active()) return;
+      if (failure?.code === ROOM_ERR.ROOM_NOT_FOUND) {
+        // The table was closed meanwhile.
+        pin.input.value = '';
+        ctx.roomClosed(summary.code);
+        return;
+      }
       pinError.show(errorMessage(failure));
       if (RETRY_WAIT_CODES.includes(failure?.code)) {
         markInvalid(pin.input, failure.code === ROOM_ERR.WRONG_PIN);
