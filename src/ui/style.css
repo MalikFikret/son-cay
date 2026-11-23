@@ -2673,3 +2673,58 @@ li.tablo-row { min-height: 56px; }
 }
 
 .loot-empty-title { font-family: var(--font-display); font-size: 20px; line-height: 1.1; }
+
+/* --- Fidye: the Hapis ransom (task 4.3c, decision 64; no own mock: Çal sheet + Ganimet card) --- */
+
+/* A short neutral line for the two players of a closed offer (never red). */
+.table-note {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(63, 181, 172, 0.45);
+  background-color: rgba(63, 181, 172, 0.08);
+  font-size: 13px;
+}
+
+/* The jailed player's row above the hand. */
+.ransom-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  border: 1px solid var(--line-soft);
+  background-color: var(--surface);
+}
+
+.ransom-row-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.ransom-row-actions { display: flex; gap: 8px; flex-shrink: 0; }
+.ransom-row-actions .btn { width: auto; min-height: 44px; padding: 6px 14px; font-size: 14px; line-height: 1.2; }
+
+/* The recipient's card: two buttons on the right, the offered tool is not a choice. */
+.ransom-actions { display: flex; gap: 8px; margin-left: auto; flex-shrink: 0; }
+.ransom-actions .btn-loot { margin: 0; min-width: 0; }
+.ransom-tool { cursor: default; }
+
+/* The Fidye sheet's players: name buttons in the Çal sheet's look. */
+.ransom-player {
+  min-height: 44px;
+  margin: 0;
+  padding: 6px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line-soft);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ransom-player.is-chosen { border: 2px solid var(--accent); }

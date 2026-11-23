@@ -224,11 +224,11 @@ export function seatTags(player, { viewerId, turnId, target, present, out, ended
 
 // --- Last move -----------------------------------------------------------------------------------
 
-const MOVE_TYPES = ['shot', 'playerRemoved', 'toolUsed', 'turnSkipped'];
+const MOVE_TYPES = ['shot', 'playerRemoved', 'toolUsed', 'turnSkipped', 'jailReleased'];
 
 /**
  * The last move as one line, from public information only: the latest shot (with the players it
- * eliminated), removal, announced tool use or jail skip. Private events are ignored.
+ * eliminated), removal, announced tool use, jail skip or release by ransom. Private events are ignored.
  * @param {object[]} events the events seen so far (oldest first)
  * @param {(id: string) => string} nameOf
  * @returns {{ lead: string, effect: 'live' | 'blank' | null, tail: string } | null}
@@ -255,6 +255,8 @@ export function lastMove(events, nameOf) {
     return { lead: toolUsedLine(e, nameOf), effect: null, tail: blocked.length > 0 ? TEXT.toolBlockedTail(blocked.join(TEXT.and)) : '' };
   }
   if (e.type === 'turnSkipped') return { lead: TEXT.turnSkippedLine(nameOf(e.player)), effect: null, tail: '' };
+  // A ransom was accepted (public): never by whom or for what (decision 64).
+  if (e.type === 'jailReleased') return { lead: TEXT.jailReleasedLine(nameOf(e.player)), effect: null, tail: '' };
   let lead;
   if (e.auto) lead = TEXT.shotOnTimeout(nameOf(e.shooter));
   else if (e.target === e.shooter) lead = TEXT.shotAtSelf(nameOf(e.shooter));

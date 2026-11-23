@@ -9,7 +9,12 @@
 // with a target is aimed on the table (the pick bar replaces the fire button meanwhile); El
 // Değiştir shows the tool COUNTS on the seats, Çal its own sheet with the victim's tools.
 // Loot (task 4.3b, decision 63): the looter alone gets a "Ganimet" card above the hand, one row
-// per victim, with its own 15 s countdown; the game goes on meanwhile. The host sees a kick button on a disconnected
+// per victim, with its own 15 s countdown; the game goes on meanwhile.
+// Fidye (task 4.3c, decision 64): a jailed player with tools gets a "Fidye" row above the hand
+// (a sheet like Çal's: a player, a tool, "Teklif et"; a pending offer with "Geri çek"); the
+// recipient gets a card like the Ganimet card ("Kabul et" / "Reddet", no countdown). Only those
+// two see anything, plus a short line when the offer closes; everyone else sees only the public
+// "X hapisten çıktı.". The host sees a kick button on a disconnected
 // player's seat (removeAbsentPlayer). After the last shot the end screen (approved mocks 6-8 of
 // conversation 13) replaces the table until the player presses "Salona dön".
 //
@@ -49,6 +54,18 @@ import {
   toolTargets,
 } from '../tool-model.js';
 import { keepLootPick, lootAction, lootCards, lootErrorText, lootPick, lootTexts } from '../loot-model.js';
+import {
+  acceptAction,
+  incomingCards,
+  offerAction,
+  pendingText,
+  ransomChoices,
+  ransomErrorText,
+  ransomNotices,
+  ransomRow,
+  rejectAction,
+  withdrawAction,
+} from '../ransom-model.js';
 import { revolverSvg, SHOT_TIMING } from '../revolver.js';
 import { LONG_PRESS_MS, PRESS, initialPress, isPressing, pressStep } from '../fire-press.js';
 import {
@@ -128,6 +145,9 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
   let stealSeen = null; // the Çal step whose sheet was opened automatically
   const lootPicks = new Map(); // victim -> { index, tool }: my selection on a Ganimet card
   let lootSending = false;
+  let ransomSending = false;
+  let ransomTo = null; // the Fidye sheet's choices (this device only)
+  let ransomTool = null;
 
   // --- Static parts --------------------------------------------------------------------------
   const roundTitle = h('span', { class: 'table-round' });
@@ -179,6 +199,18 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
   const lootWrap = h('div', { class: 'loot-cards', hidden: true });
   const lootEls = new Map(); // victim -> { el, ringBar, ring, seconds, key, over }
 
+  // Fidye: the recipient's cards, and the jailed player's row (decision 64).
+  const ransomWrap = h('div', { class: 'loot-cards ransom-cards', hidden: true });
+  let ransomKey = null;
+  const ransomText = h('span', { class: 'ransom-text' });
+  const ransomOpen = h('button', { type: 'button', class: 'btn btn-outline ransom-open', on: { click: () => openRansom() } });
+  const ransomBack = h('button', { type: 'button', class: 'btn btn-outline ransom-withdraw', text: TEXT.ransomWithdraw, on: { click: () => sendRansom(withdrawAction()) } });
+  const ransomBar = h('div', { class: 'ransom-row', hidden: true },
+    h('span', { class: 'ransom-row-text' }, ransomText),
+    h('div', { class: 'ransom-row-actions' }, ransomBack, ransomOpen));
+  // A short neutral line for the two players of a closed offer (never red, decision 54).
+  const noteLine = h('p', { class: 'table-note', role: 'status', hidden: true });
+
   const handTitle = h('span', { class: 'hand-title' });
   const handUsed = h('span', { class: 'hand-used' });
   const handList = h('div', { class: 'hand-list' });
@@ -203,7 +235,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
 
   const tableView = h('div', { class: 'table-view' },
     topBar, stage,
-    h('div', { class: 'table-lower' }, status, effects, errors.el, lootWrap, hand, strip, stepBar, fireWrap),
+    h('div', { class: 'table-lower' }, status, effects, errors.el, noteLine, lootWrap, ransomWrap, ransomBar, hand, strip, stepBar, fireWrap),
     reloadLive2);
 
   // End screen (filled when the match is over).
@@ -430,6 +462,78 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
     await sendTool(action);
   }
 
+  // The Fidye sheet (decision 64, built like Çal's): a living player, one of my tools, "Teklif et".
+  const ransomSheet = createSheet({ title: TEXT.ransomButton, className: 'steal-sheet ransom-sheet' });
+  const ransomBody = h('div', { class: 'steal-body' });
+  const ransomNo = h('button', { type: 'button', class: 'btn btn-outline', text: TEXT.cancel, on: { click: () => ransomSheet.close() } });
+  const ransomYes = h('button', { type: 'button', class: 'btn btn-primary', text: TEXT.ransomSend, on: { click: () => sendOffer() } });
+  ransomSheet.body.append(h('p', { class: 'hint steal-note', text: TEXT.ransomSheetNote }), ransomBody,
+    h('div', { class: 'dialog-actions' }, ransomNo, ransomYes));
+
+  function openRansom() {
+    if (!applied || !ransomRow(applied.view)?.canOffer) return;
+    const pending = ransomRow(applied.view).pending;
+    ransomTo = pending ? pending.to : null;
+    ransomTool = null;
+    renderRansomSheet();
+    ransomSheet.open();
+  }
+
+  function renderRansomSheet() {
+    const choices = applied ? ransomChoices(applied.legalActions) : { players: [], tools: [] };
+    if (!choices.players.includes(ransomTo)) ransomTo = null;
+    if (!choices.tools.includes(ransomTool)) ransomTool = null;
+    const players = h('div', { class: 'steal-list' }, ...choices.players.map((id) => h('button', {
+      type: 'button',
+      class: id === ransomTo ? 'ransom-player is-chosen' : 'ransom-player',
+      'aria-pressed': String(id === ransomTo),
+      disabled: ransomSending,
+      text: nameOf(id),
+      on: { click: () => { ransomTo = ransomTo === id ? null : id; renderRansomSheet(); } },
+    })));
+    const tools = h('div', { class: 'steal-list' }, ...choices.tools.map((tool) => h('button', {
+      type: 'button',
+      class: tool === ransomTool ? 'steal-tool is-chosen' : 'steal-tool',
+      'aria-pressed': String(tool === ransomTool),
+      disabled: ransomSending,
+      on: { click: () => { ransomTool = ransomTool === tool ? null : tool; renderRansomSheet(); } },
+    }, toolIcon(tool, 'small'), h('span', { class: 'hand-name', text: toolName(tool) }))));
+    ransomBody.replaceChildren(
+      h('h3', { class: 'steal-head', text: TEXT.ransomTo }), players,
+      h('h3', { class: 'steal-head', text: TEXT.ransomWhich }), tools);
+    ransomYes.disabled = ransomSending || offerAction({ to: ransomTo, tool: ransomTool }, choices) === null;
+    ransomNo.disabled = ransomSending;
+  }
+
+  async function sendOffer() {
+    const action = applied ? offerAction({ to: ransomTo, tool: ransomTool }, ransomChoices(applied.legalActions)) : null;
+    if (!action) return;
+    ransomSheet.close();
+    await sendRansom(action);
+  }
+
+  // Sends one ransom action of my own seat; nothing else about an offer is written anywhere.
+  async function sendRansom(action) {
+    if (!action || ransomSending) return;
+    ransomSending = true;
+    renderRansom();
+    try {
+      const result = await api.submitAction({ uid, code, action });
+      if (!destroyed && !result.ok) showError(ransomErrorText(result.error));
+    } catch (error) {
+      report(error);
+    } finally {
+      ransomSending = false;
+      if (!destroyed) renderRansom();
+    }
+  }
+
+  function showNote(text) {
+    noteLine.textContent = text;
+    noteLine.hidden = false;
+    later(() => { noteLine.hidden = true; }, ERROR_SHOW_MS, 'note');
+  }
+
   // --- Live parts ------------------------------------------------------------------------------
   function report(error) {
     if (destroyed) return;
@@ -510,6 +614,10 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
       }
     }
     if (destroyed) return;
+    if (!update.initial) {
+      const notes = ransomNotices(update.events, mySeat);
+      if (notes.length > 0) showNote(notes.join(' '));
+    }
     outs = outRounds(update.events, outs, round);
     round = lastRound(update.events, round);
     events = events.concat(update.events);
@@ -588,6 +696,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
     renderStatus(view);
     renderEffects(view);
     renderLoot();
+    renderRansom();
     renderHand(view);
     renderStep();
     renderFire();
@@ -846,6 +955,44 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
       lootSending = false;
       if (!destroyed) renderLoot();
     }
+  }
+
+  // --- Fidye (decision 64) ---------------------------------------------------------------------
+  // From my own view only: my standing offer (view.self.ransomOffer) and the offers made to me.
+  function renderRansom() {
+    const view = applied?.view;
+    const row = view ? ransomRow(view) : null;
+    ransomBar.hidden = row === null;
+    if (row === null) {
+      ransomSheet.close();
+    } else {
+      ransomText.textContent = row.pending ? pendingText(row.pending, nameOf) : TEXT.ransomHint;
+      ransomOpen.textContent = row.pending ? TEXT.ransomChange : TEXT.ransomButton;
+      ransomOpen.hidden = !row.canOffer;
+      ransomOpen.disabled = ransomSending;
+      ransomBack.hidden = !row.pending;
+      ransomBack.disabled = ransomSending;
+      if (ransomSheet.isOpen()) renderRansomSheet();
+    }
+    const cards = view ? incomingCards(view) : [];
+    const key = JSON.stringify([cards, ransomSending, cards.map((c) => nameOf(c.from))]);
+    if (key === ransomKey) return;
+    ransomKey = key;
+    ransomWrap.hidden = cards.length === 0;
+    ransomWrap.replaceChildren(...cards.map((card) => h('section', { class: 'loot-card ransom-card', 'aria-label': TEXT.ransomButton },
+      h('div', { class: 'loot-head' },
+        h('div', { class: 'loot-head-text' },
+          h('span', { class: 'loot-title', text: TEXT.ransomIncomingTitle(nameOf(card.from)) }),
+          h('span', { class: 'loot-sub', text: TEXT.ransomIncomingSub }))),
+      h('div', { class: 'loot-row' },
+        h('div', { class: 'loot-tools' },
+          h('span', { class: 'loot-tool ransom-tool' },
+            h('span', { class: 'loot-tool-badge' }, toolIcon(card.tool, 'small')),
+            h('span', { class: 'loot-tool-name', text: card.name }))),
+        h('div', { class: 'ransom-actions' },
+          h('button', { type: 'button', class: 'btn-loot btn-loot-ok', text: TEXT.ransomReject, disabled: ransomSending, on: { click: () => sendRansom(rejectAction(card)) } }),
+          // Always enabled: whether the offer is still funded is the offerer's secret.
+          h('button', { type: 'button', class: 'btn-loot btn-loot-take', text: TEXT.ransomAccept, disabled: ransomSending, on: { click: () => sendRansom(acceptAction(card)) } }))))));
   }
 
   // My hand (decision 54): small badges on every turn, turn tools faded on others' turns, and on
@@ -1187,6 +1334,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
       kickSheet.destroy();
       card.destroy();
       stealSheet.destroy();
+      ransomSheet.destroy();
       document.removeEventListener('click', closeEffects);
       clearInterval(tick);
       for (const id of timers) clearTimeout(id);
