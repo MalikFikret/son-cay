@@ -18,7 +18,11 @@
        the SDK's REST client; not used while WebSockets work, listed so it is never blocked).
      Long polling is never used (it would need script-src for the database host). -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://www.gstatic.com; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self'; connect-src http://127.0.0.1:9099 http://127.0.0.1:9000 ws://127.0.0.1:9000 https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://son-cay-default-rtdb.europe-west1.firebasedatabase.app wss://son-cay-default-rtdb.europe-west1.firebasedatabase.app wss://*.europe-west1.firebasedatabase.app; base-uri 'none'; form-action 'none'">
-<meta name="referrer" content="no-referrer">
+<!-- Referrer: "strict-origin" sends only the origin (https://malikfikret.github.io), never the
+     path or the #/masa/CODE hash, and nothing over plain HTTP. The real API key is restricted to
+     this website in Google Cloud, so anonymous sign-in (identitytoolkit / securetoken) is refused
+     without it: "no-referrer" would block the game. -->
+<meta name="referrer" content="strict-origin">
 <meta name="theme-color" content="#15100C">
 <meta name="description" content="Son Çay: arkadaşlarınla çevrimiçi oynanan bir şans ve taktik oyunu.">
 <title>Son Çay</title>

@@ -6,6 +6,9 @@ reveal, protect or deceive. The last player alive wins. There are two modes: **C
 dealt at random) and **Custom** (Classic plus private information, coins and a shop, and
 predictions for eliminated players). Session points add up across the matches played in a room.
 
+**Play:** https://malikfikret.github.io/son-cay/ (open it on every player's phone or computer; one
+player creates a table and shares its link).
+
 The game is in Turkish. It is still in development. Served from this machine (localhost) it runs
 against the local Firebase emulators; served from any other host (GitHub Pages) it uses the real
 Firebase project of the game (`src/ui/firebase.js`).
@@ -39,3 +42,11 @@ npm run test:rules  # security rules and room layer on the emulators (starts and
 
 The security rules are generated from `tools/rules/` with `npm run rules:build`; never edit
 `database.rules.json` by hand (a test checks that it matches the generator).
+
+## Deploy
+
+The site is published on GitHub Pages by the GitHub Actions workflow
+`.github/workflows/pages.yml` on every push to `main`: it runs `npm test`, then publishes only
+`index.html` and `src/` (built and checked by `tools/pages-site.js`). The security rules
+(`database.rules.json`) are uploaded to the Firebase project separately with
+`firebase deploy --only database`.

@@ -92,6 +92,18 @@ describe('index.html', () => {
     for (const source of directives['connect-src'].slice(3)) assert.ok(comment.includes(source), `${source} is explained`);
   });
 
+  test('sends only the origin as referrer (the API key is restricted to the website)', () => {
+    const tags = html.match(/<meta name="referrer"[^>]*>/g) ?? [];
+    assert.deepEqual(tags, ['<meta name="referrer" content="strict-origin">']);
+  });
+
+  test('uses only relative paths (the site lives under /son-cay/, not at the domain root)', () => {
+    for (const [, attr, value] of html.matchAll(/\s(href|src)="([^"]*)"/g)) {
+      assert.ok(!value.startsWith('/'), `${attr}="${value}" is root-absolute`);
+      assert.ok(value.startsWith('https://') || !value.includes(':'), `${attr}="${value}"`);
+    }
+  });
+
   test('is Turkish, left to right, and loads the UI entry module', () => {
     assert.match(html, /<html lang="tr" dir="ltr">/);
     assert.match(html, /<script type="module" src="src\/ui\/app\.js"><\/script>/);
@@ -135,5 +147,38 @@ describe('the real Firebase web config', () => {
     // The emulators are connected only for the emulator target.
     assert.match(text, /if \(IS_EMULATOR\) connectAuthEmulator\(/);
     assert.match(text, /if \(IS_EMULATOR\) connectDatabaseEmulator\(/);
+  });
+});
+
+describe('paths under a sub-path (GitHub Pages serves the game at /son-cay/)', () => {
+  // Every module, stylesheet and asset the browser loads lives under src/ and is reached with a
+  // relative path; a root-absolute "/..." would point outside /son-cay/.
+  function files(dir, ext) {
+    const out = [];
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const url = new URL(entry.name + (entry.isDirectory() ? '/' : ''), dir);
+      if (entry.isDirectory()) out.push(...files(url, ext));
+      else if (ext.test(entry.name)) out.push(url);
+    }
+    return out;
+  }
+
+  test('no module import or dynamic import starts with "/"', () => {
+    for (const url of files(new URL('src/', root), /\.js$/)) {
+      const text = readFileSync(url, 'utf8');
+      for (const [, spec] of text.matchAll(/(?:from|import)\s*\(?\s*['"]([^'"]+)['"]/g)) {
+        assert.ok(!spec.startsWith('/'), `${url.pathname}: import "${spec}"`);
+        assert.ok(spec.startsWith('.') || spec.startsWith('https://www.gstatic.com/'), `${url.pathname}: import "${spec}"`);
+      }
+      assert.doesNotMatch(text, /\b(fetch|navigate|pushState|replaceState)\([^)]*['"`]\//, `${url.pathname}: a root-absolute address`);
+    }
+  });
+
+  test('no stylesheet url() starts with "/"', () => {
+    for (const url of files(new URL('src/', root), /\.css$/)) {
+      for (const [, value] of readFileSync(url, 'utf8').matchAll(/url\(\s*['"]?([^'")]+)/g)) {
+        assert.ok(!value.startsWith('/'), `${url.pathname}: url(${value})`);
+      }
+    }
   });
 });

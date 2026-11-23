@@ -1,0 +1,81 @@
+# Publishes the game on GitHub Pages (https://malikfikret.github.io/son-cay/), task 4.5b.
+#
+# On every push to main and on a manual run: run the tests, build the site folder with ONLY what
+# the browser loads (index.html + src/, see tools/pages-site.js, which also fails the run if
+# anything else ends up in it), upload it and deploy it. Repository settings: Settings > Pages >
+# Source: "GitHub Actions".
+#
+# Actions are pinned to full commit SHAs (the version is in the comment). npm test needs no
+# installed dependencies (node:test and node:assert only), so nothing is installed.
+
+name: Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Least privilege: the build job only reads the repository; only the deploy job may write to
+# Pages and request the OIDC token deploy-pages needs.
+permissions:
+  contents: read
+
+# Never two deploys at the same time; a running deploy is not cancelled by a newer push.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node (LTS)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+
+      - name: Run the tests
+        run: npm test
+
+      - name: Stamp the version (Hakkında shows the deployed commit)
+        run: npm run version:write
+
+      - name: Build the site folder (index.html + src/ only) and check it
+        run: node tools/pages-site.js _site
+
+      - name: Fail if anything but index.html and src/ is in the site
+        run: |
+          set -eu
+          test "$(ls -A _site | sort | tr '\n' ' ')" = "index.html src "
+          for name in dev tests tests-firebase tools docs node_modules; do
+            if [ -n "$(find _site -name "$name")" ]; then echo "::error::$name found in the site"; exit 1; fi
+          done
+          for name in database.rules.json firebase.json package.json package-lock.json CLAUDE.md '.env*'; do
+            if [ -n "$(find _site -name "$name")" ]; then echo "::error::$name found in the site"; exit 1; fi
+          done
+
+      - name: Upload the site
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
