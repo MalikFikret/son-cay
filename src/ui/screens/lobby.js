@@ -50,7 +50,7 @@ import { ROOM_ERR } from '../../rooms/index.js';
 const LOST_CODES = [ROOM_ERR.SEAT_LOST, ROOM_ERR.NOT_MEMBER, ROOM_ERR.ROOM_NOT_FOUND];
 
 /**
- * @param {object} ctx  { api, uid, go, goHome(message), roomClosed(code), forgetTable(), refresh(message) }
+ * @param {object} ctx  { api, uid, go, goHome(message, { info }), roomClosed(code), forgetTable(), refresh(message) }
  * @param {object} view { active(), onLeave(fn) }
  * @param {{ code: string, mine: { seatId: string }, message?: string }} params
  */
@@ -587,7 +587,7 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
       stopAll();
       if (failure?.code === ROOM_ERR.ROOM_NOT_FOUND) {
         ctx.forgetTable();
-        ctx.goHome(TEXT.roomClosed);
+        ctx.goHome(TEXT.roomClosed, { info: true });
         return null;
       }
       // Presence may already be stopped: draw the screen again, with the message.
@@ -597,7 +597,7 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
     ended = true;
     stopAll();
     ctx.forgetTable();
-    if (view.active()) ctx.goHome(TEXT.roomClosedByMe);
+    if (view.active()) ctx.goHome(TEXT.roomClosedByMe, { info: true });
     return null;
   }
 

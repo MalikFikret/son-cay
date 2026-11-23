@@ -42,9 +42,12 @@ const ctx = {
     rememberCode(code);
     ctx.go(hashFor.table(code));
   },
-  /** Back to Giriş, with an optional message there. */
-  goHome(message) {
-    goHome(message);
+  /**
+   * Back to Giriş, with an optional message there; `info: true` shows it in the neutral style
+   * (a confirmation such as "Masayı kapattın."), otherwise in the error colour.
+   */
+  goHome(message, { info = false } = {}) {
+    goHome(message, { info });
   },
   /** The table was closed (decision Q67): "Masa kapatıldı" for a few seconds, then Giriş. */
   roomClosed(code) {
@@ -64,6 +67,7 @@ const ctx = {
 // A message to show once on the next home or waiting-room screen (e.g. after a broken invite
 // link, or a seat lost to another device).
 let flash = null;
+let flashInfo = false; // the flash confirms something (neutral style on Giriş), not an error
 
 // Each rendered screen gets a view: `active()` turns false as soon as another screen replaces
 // it, so late answers of the database never touch the page or navigate.
@@ -89,8 +93,9 @@ function showLoading(text) {
   show(screen('screen-loading', loading(text)));
 }
 
-function goHome(message) {
+function goHome(message, { info = false } = {}) {
   flash = message ?? null;
+  flashInfo = info === true;
   ctx.go(hashFor.home(), { replace: true });
 }
 
@@ -172,8 +177,10 @@ function route() {
   switch (current.name) {
     case ROUTES.HOME: {
       const message = flash;
+      const info = flashInfo;
       flash = null;
-      show(homeScreen(ctx, view, { message }));
+      flashInfo = false;
+      show(homeScreen(ctx, view, { message, info }));
       return;
     }
     case ROUTES.CREATE:

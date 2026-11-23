@@ -84,6 +84,18 @@ export const RETRY_WAIT_SECONDS = 2;
  * suffixes depend on the name, so the texts say "adlı oyuncu" instead.
  */
 export const TEXT = Object.freeze({
+  // Shot result notice (decision Q68)
+  shotNoticeLive: 'Dolu',
+  shotNoticeBlank: 'Boş',
+  shotNoticeDouble: '2×',
+  shotNoticeSelf: (name) => `${name} kendine ateş etti`,
+  shotNoticeDamage: (amount) => `−${amount}`,
+  shotNoticeOut: '· çıktı',
+  shotNoticeChain: '· zincir',
+  shotNoticeReflected: 'kalkan geri çevirdi',
+  shotNoticeAbsorbed: 'kalkan durdurdu',
+  shotNoticeTwoShields: 'iki kalkan, kimse zarar görmedi',
+  shotNoticeTurn: (name) => `Sıra: ${name}.`,
   // Closing the table (decision Q67)
   closeRoom: 'Masayı kapat',
   closeRoomTitle: 'Masa kapatılsın mı?',

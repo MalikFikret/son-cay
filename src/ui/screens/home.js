@@ -7,7 +7,11 @@ import { FORM_MESSAGES, errorMessage } from '../messages.js';
 import { codeFromText, hashFor } from '../routes.js';
 import { CODE_LENGTH } from '../../rooms/index.js';
 
-export function homeScreen(ctx, view, { message } = {}) {
+/**
+ * @param {{ message?: string, info?: boolean }} params `info`: the message confirms a successful
+ *   action (neutral style, role status), otherwise it is an error
+ */
+export function homeScreen(ctx, view, { message, info = false } = {}) {
   const codeInput = h('input', {
     id: 'code', type: 'text', class: 'input input-code', maxlength: CODE_LENGTH, autocomplete: 'off',
     autocapitalize: 'characters', spellcheck: 'false', placeholder: '4KX9QZ', 'aria-describedby': 'code-error',
@@ -57,15 +61,22 @@ export function homeScreen(ctx, view, { message } = {}) {
     if (view.active()) ctx.go(hashFor.table(code));
   }
 
-  if (message) {
+  // A confirmation (e.g. "Masayı kapattın.") is not an error: shown in the neutral style.
+  const infoLine = h('p', { class: 'field-error status-line', role: 'status', hidden: true });
+  if (message && info) {
+    infoLine.textContent = message;
+    infoLine.hidden = false;
+  } else if (message) {
     error.show(message);
   }
+  codeInput.addEventListener('input', () => { infoLine.hidden = true; });
 
   const form = h('form', { class: 'home-actions', novalidate: true, on: { submit: onJoin } },
     h('div', { class: 'field' },
       h('label', { class: 'label', for: 'code', text: 'Masa kodu' }),
       codeInput,
-      error.el),
+      error.el,
+      infoLine),
     join,
     h('div', { class: 'divider' }, h('span', { class: 'rule' }), h('span', { text: 'ya da' }), h('span', { class: 'rule' })),
     h('button', { type: 'button', class: 'btn btn-outline', text: 'Yeni masa kur', on: { click: () => ctx.go(hashFor.create()) } }),

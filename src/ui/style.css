@@ -2784,3 +2784,137 @@ li.tablo-row { min-height: 56px; }
 }
 
 .btn-close-yes:disabled { opacity: 0.6; cursor: default; }
+
+/* --- Shot result notice (decision Q68; approved mocks, conversation 19 models 1 and 2) -------
+   Under the top bar, over the top of the table only (the region has no height, so the hand,
+   the fire button and the Ganimet card below are never covered). Dolu copper, Boş turquoise;
+   never red (decision 54). */
+
+.shot-notice-region {
+  position: relative;
+  height: 0;
+  z-index: 6;
+}
+
+.shot-notice {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background-color: var(--surface);
+  border: 1.5px solid var(--accent);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  animation: shot-notice-in 180ms ease-out;
+}
+
+.shot-notice.is-live { border-color: var(--rust); }
+
+.shot-notice-head {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.shot-notice-arrow { color: var(--text); }
+
+.shot-notice-word {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.shot-notice-effect {
+  font-family: var(--font-display);
+  font-size: 24px;
+  line-height: 1;
+  color: #8FDAD3;
+}
+
+.shot-notice.is-live .shot-notice-effect { color: #E07A4F; }
+
+.shot-notice-double {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--rust);
+  color: #E07A4F;
+}
+
+.shot-notice-rows {
+  margin: 0;
+  padding: 6px 0 0;
+  list-style: none;
+  border-top: 1px solid var(--line-faint);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+}
+
+.shot-notice-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.shot-notice-name { min-width: 0; overflow-wrap: anywhere; }
+.shot-notice-chain { color: var(--muted); }
+
+.shot-notice-value {
+  flex-shrink: 0;
+  color: #E07A4F;
+  font-weight: 600;
+}
+
+.shot-notice-value.is-shield { color: #8FDAD3; font-weight: 400; }
+
+.shot-notice-line {
+  margin: 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.shot-notice-bar {
+  display: block;
+  height: 3px;
+  margin-top: 4px;
+  border-radius: 2px;
+  background-color: #3A2E24;
+  overflow: hidden;
+}
+
+.shot-notice-fill {
+  display: block;
+  height: 3px;
+  border-radius: 2px;
+  background-color: var(--accent);
+  transform-origin: left center;
+  animation-name: shot-notice-countdown;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+.shot-notice.is-live .shot-notice-fill { background-color: var(--rust); }
+
+@keyframes shot-notice-countdown {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+
+/* A slide only, never a fade: the notice is fully visible even where animations do not run
+   (e.g. a background tab). */
+@keyframes shot-notice-in {
+  from { transform: translateY(-6px); }
+  to { transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shot-notice { animation: none; }
+}

@@ -31,6 +31,7 @@
 import { h, svg } from '../dom.js';
 import { ICONS, errorLine } from '../components.js';
 import { createCloseRoom } from '../close-room.js';
+import { shotNotice } from '../shot-notice.js';
 import { TEXT, errorMessage } from '../messages.js';
 import { MODE_LABELS } from '../lobby-model.js';
 import { createSheet } from '../sheet.js';
@@ -238,8 +239,12 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
 
   const closeControl = createCloseRoom({ id: 'table-close', onConfirm: () => (onCloseRoom ? onCloseRoom() : null) });
 
+  // Shot result notice (decision Q68): under the top bar, over the top of the table for a few
+  // seconds after each live shot. Polite live region; its content is rebuilt per shot.
+  const noticeRegion = h('div', { class: 'shot-notice-region', 'aria-live': 'polite' });
+
   const tableView = h('div', { class: 'table-view' },
-    topBar, stage,
+    topBar, noticeRegion, stage,
     h('div', { class: 'table-lower' }, status, effects, errors.el, noteLine, lootWrap, ransomWrap, ransomBar, hand, strip, stepBar, fireWrap, closeControl.el),
     reloadLive2);
 
@@ -565,6 +570,36 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
 
   // A timer that is cleared on destroy. A named one replaces its previous run.
   const named = new Map();
+  // Draws a shot notice (replacing any shown one) and removes it after its duration. Names go in
+  // through textContent only (h's text).
+  function showShotNotice(notice) {
+    const live = notice.kind === 'live';
+    const head = notice.self
+      ? h('p', { class: 'shot-notice-head', text: TEXT.shotNoticeSelf(notice.shooter) })
+      : h('p', { class: 'shot-notice-head' },
+        h('span', { text: notice.shooter }),
+        h('span', { class: 'shot-notice-arrow', text: ' → ' }),
+        h('span', { text: notice.target }));
+    const word = h('div', { class: 'shot-notice-word' },
+      h('span', { class: 'shot-notice-effect', text: notice.word }),
+      notice.double ? h('span', { class: 'shot-notice-double', text: TEXT.shotNoticeDouble }) : null);
+    const rows = notice.rows.length > 0
+      ? h('ul', { class: 'shot-notice-rows' }, notice.rows.map((row) => h('li', { class: 'shot-notice-row' },
+        h('span', { class: 'shot-notice-name' },
+          h('span', { text: row.name }),
+          row.chain ? h('span', { class: 'shot-notice-chain', text: ` ${TEXT.shotNoticeChain}` }) : null),
+        h('span', { class: row.tone === 'shield' ? 'shot-notice-value is-shield' : 'shot-notice-value', text: row.value }))))
+      : null;
+    const lines = notice.lines.map((line) => h('p', { class: 'shot-notice-line', text: line }));
+    const fill = h('span', { class: 'shot-notice-fill' });
+    fill.style.animationDuration = `${notice.durationMs}ms`;
+    const card = h('div', { class: live ? 'shot-notice is-live' : 'shot-notice is-blank' },
+      head, word, rows, ...lines,
+      h('span', { class: 'shot-notice-bar', 'aria-hidden': 'true' }, fill));
+    noticeRegion.replaceChildren(card);
+    later(() => noticeRegion.replaceChildren(), notice.durationMs, 'shotNotice');
+  }
+
   function later(fn, ms, name) {
     if (name && named.has(name)) {
       clearTimeout(named.get(name));
@@ -620,6 +655,9 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
     }
     if (destroyed) return;
     if (!update.initial) {
+      // Only live updates: a (re)loaded page never replays an old notice.
+      const notice = shots.length > 0 ? shotNotice(update.events, nameOf) : null;
+      if (notice) showShotNotice(notice);
       const notes = ransomNotices(update.events, mySeat);
       if (notes.length > 0) showNote(notes.join(' '));
     }
