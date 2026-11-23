@@ -96,6 +96,8 @@ export const TEXT = Object.freeze({
   shotNoticeAbsorbed: 'kalkan durdurdu',
   shotNoticeTwoShields: 'iki kalkan, kimse zarar görmedi',
   shotNoticeTurn: (name) => `Sıra: ${name}.`,
+  // Private tool result notice (decision Q69)
+  toolNoticeLast: 'Son mermi',
   // Closing the table (decision Q67)
   closeRoom: 'Masayı kapat',
   closeRoomTitle: 'Masa kapatılsın mı?',

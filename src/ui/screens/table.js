@@ -32,6 +32,7 @@ import { h, svg } from '../dom.js';
 import { ICONS, errorLine } from '../components.js';
 import { createCloseRoom } from '../close-room.js';
 import { shotNotice } from '../shot-notice.js';
+import { toolNotice } from '../tool-notice.js';
 import { TEXT, errorMessage } from '../messages.js';
 import { MODE_LABELS } from '../lobby-model.js';
 import { createSheet } from '../sheet.js';
@@ -596,8 +597,27 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
     const card = h('div', { class: live ? 'shot-notice is-live' : 'shot-notice is-blank' },
       head, word, rows, ...lines,
       h('span', { class: 'shot-notice-bar', 'aria-hidden': 'true' }, fill));
+    showNotice(card, notice.durationMs);
+  }
+
+  // My private tool result (decision Q69): cream, "Yalnız sen görüyorsun", same place and size.
+  function showToolNotice(notice) {
+    const fill = h('span', { class: 'shot-notice-fill' });
+    fill.style.animationDuration = `${notice.durationMs}ms`;
+    const card = h('div', { class: 'shot-notice is-private' },
+      h('p', { class: 'shot-notice-head' },
+        h('span', { class: 'tool-notice-name', text: notice.name }),
+        h('span', { text: ` · ${TEXT.onlyYouSee}` })),
+      h('div', { class: 'shot-notice-word' }, h('span', { class: 'shot-notice-effect', text: notice.word })),
+      h('p', { class: 'shot-notice-line', text: notice.scope }),
+      h('span', { class: 'shot-notice-bar', 'aria-hidden': 'true' }, fill));
+    showNotice(card, notice.durationMs);
+  }
+
+  // One notice at a time: a newer shot or tool notice replaces the one shown.
+  function showNotice(card, ms) {
     noticeRegion.replaceChildren(card);
-    later(() => noticeRegion.replaceChildren(), notice.durationMs, 'shotNotice');
+    later(() => noticeRegion.replaceChildren(), ms, 'notice');
   }
 
   function later(fn, ms, name) {
@@ -658,6 +678,9 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
       // Only live updates: a (re)loaded page never replays an old notice.
       const notice = shots.length > 0 ? shotNotice(update.events, nameOf) : null;
       if (notice) showShotNotice(notice);
+      // My own private tool result (decision Q69): only my device ever receives it.
+      const mine = notice ? null : toolNotice(update.events, mySeat);
+      if (mine) showToolNotice(mine);
       const notes = ransomNotices(update.events, mySeat);
       if (notes.length > 0) showNote(notes.join(' '));
     }

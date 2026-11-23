@@ -2918,3 +2918,10 @@ li.tablo-row { min-height: 56px; }
 @media (prefers-reduced-motion: reduce) {
   .shot-notice { animation: none; }
 }
+
+/* Private tool result notice (decision Q69): neutral cream, never copper / turquoise / red, so it
+   is never taken for the public shot notice. */
+.shot-notice.is-private { border-color: rgba(239, 230, 214, 0.7); }
+.shot-notice.is-private .shot-notice-effect { color: var(--text); }
+.shot-notice.is-private .shot-notice-fill { background-color: var(--text); }
+.tool-notice-name { color: var(--text); font-weight: 600; }
