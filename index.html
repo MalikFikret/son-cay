@@ -4,9 +4,20 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <!-- Content-Security-Policy: scripts only from this site and the Firebase CDN, styles and fonts
-     only from this site and Google Fonts, connections only to the LOCAL emulators (auth 9099,
-     database 9000). The real-Firebase step must change connect-src (see CLAUDE.md). -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://www.gstatic.com; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self'; connect-src http://127.0.0.1:9099 http://127.0.0.1:9000 ws://127.0.0.1:9000; base-uri 'none'; form-action 'none'">
+     only from this site and Google Fonts. connect-src, by target (src/ui/firebase.js):
+     - localhost (emulators): http://127.0.0.1:9099 (auth emulator), http://127.0.0.1:9000 and
+       ws://127.0.0.1:9000 (database emulator);
+     - production (project son-cay), anonymous sign-in of the Firebase JS SDK 13.4.0:
+       https://identitytoolkit.googleapis.com (accounts:signUp creates the anonymous user,
+       accounts:lookup reads it back), https://securetoken.googleapis.com (refreshes the ID token);
+     - production Realtime Database (europe-west1), WebSocket only (forceWebSockets):
+       wss://son-cay-default-rtdb.europe-west1.firebasedatabase.app (the database's WebSocket),
+       wss://*.europe-west1.firebasedatabase.app (the server named in the connection handshake,
+       which the SDK then connects to, e.g. s-....europe-west1.firebasedatabase.app),
+       https://son-cay-default-rtdb.europe-west1.firebasedatabase.app (the database over HTTPS:
+       the SDK's REST client; not used while WebSockets work, listed so it is never blocked).
+     Long polling is never used (it would need script-src for the database host). -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://www.gstatic.com; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self'; connect-src http://127.0.0.1:9099 http://127.0.0.1:9000 ws://127.0.0.1:9000 https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://son-cay-default-rtdb.europe-west1.firebasedatabase.app wss://son-cay-default-rtdb.europe-west1.firebasedatabase.app wss://*.europe-west1.firebasedatabase.app; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#15100C">
 <meta name="description" content="Son Çay: arkadaşlarınla çevrimiçi oynanan bir şans ve taktik oyunu.">

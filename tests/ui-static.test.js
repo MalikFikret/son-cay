@@ -1,5 +1,6 @@
 // Game UI: static checks of the source files (no browser): no npm firebase import, no
-// innerHTML-style markup injection, no storage of the Şifre, and a strict CSP in index.html.
+// innerHTML-style markup injection, no storage of the Şifre, a strict CSP in index.html, and the
+// real Firebase web config only in src/ui/firebase.js (task 4.5a).
 
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -66,13 +67,73 @@ describe('index.html', () => {
     assert.deepEqual(directives['script-src'], ["'self'", 'https://www.gstatic.com']);
     assert.deepEqual(directives['style-src'], ["'self'", 'https://fonts.googleapis.com']);
     assert.deepEqual(directives['font-src'], ["'self'", 'https://fonts.gstatic.com']);
-    for (const source of directives['connect-src']) assert.match(source, /^(http|ws):\/\/127\.0\.0\.1:(9099|9000)$/);
+    assert.deepEqual(directives['img-src'], ["'self'"]);
+    assert.deepEqual(directives['base-uri'], ["'none'"]);
+    assert.deepEqual(directives['form-action'], ["'none'"]);
     assert.ok(!csp.includes('unsafe-inline') && !csp.includes('unsafe-eval'));
+  });
+
+  test('connects only to the local emulators and to what the real project needs, each host once', () => {
+    assert.deepEqual(directives['connect-src'], [
+      // localhost: the emulators
+      'http://127.0.0.1:9099',
+      'http://127.0.0.1:9000',
+      'ws://127.0.0.1:9000',
+      // production: anonymous sign-in (sign-up / lookup, token refresh)
+      'https://identitytoolkit.googleapis.com',
+      'https://securetoken.googleapis.com',
+      // production: the Realtime Database (HTTPS, its WebSocket, the server the handshake names)
+      'https://son-cay-default-rtdb.europe-west1.firebasedatabase.app',
+      'wss://son-cay-default-rtdb.europe-west1.firebasedatabase.app',
+      'wss://*.europe-west1.firebasedatabase.app',
+    ]);
+    // Every added host is explained in the comment above the tag.
+    const comment = html.match(/<!-- Content-Security-Policy:([\s\S]*?)-->/)?.[1] ?? '';
+    for (const source of directives['connect-src'].slice(3)) assert.ok(comment.includes(source), `${source} is explained`);
   });
 
   test('is Turkish, left to right, and loads the UI entry module', () => {
     assert.match(html, /<html lang="tr" dir="ltr">/);
     assert.match(html, /<script type="module" src="src\/ui\/app\.js"><\/script>/);
     assert.doesNotMatch(html, /\sstyle="/);
+  });
+});
+
+describe('the real Firebase web config', () => {
+  // Patterns, not values: this test must not contain the config itself.
+  const API_KEY = /AIza[0-9A-Za-z_-]{30,}/;
+  const APP_ID = /\d+:\d{6,}:web:[0-9a-f]+/;
+  const SKIP = new Set(['node_modules', '.git', 'docs', '.firebase', '.claude']);
+  function repoFiles(dir = root) {
+    const files = [];
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (SKIP.has(entry.name)) continue;
+      const url = new URL(entry.name + (entry.isDirectory() ? '/' : ''), dir);
+      if (entry.isDirectory()) files.push(...repoFiles(url));
+      else if (/\.(js|mjs|json|html|md|css|svg|txt|yml|yaml|rules)$/.test(entry.name) || entry.name.startsWith('.')) files.push(url);
+    }
+    return files;
+  }
+
+  test('lives only in src/ui/firebase.js', () => {
+    const found = repoFiles()
+      .filter((url) => {
+        const text = readFileSync(url, 'utf8');
+        return API_KEY.test(text) || APP_ID.test(text);
+      })
+      .map((url) => url.pathname.slice(root.pathname.length));
+    assert.deepEqual(found, ['src/ui/firebase.js']);
+  });
+
+  test('production uses the real project and its database; localhost a demo- project', () => {
+    const text = readFileSync(new URL('src/ui/firebase.js', root), 'utf8');
+    assert.match(text, /const PRODUCTION_PROJECT_ID = 'son-cay';/);
+    assert.match(text, /const PRODUCTION_DATABASE_URL = 'https:\/\/son-cay-default-rtdb\.europe-west1\.firebasedatabase\.app';/);
+    assert.match(text, /const EMULATOR_PROJECT_ID = 'demo-mosul-roulette';/);
+    assert.match(text, /forceWebSockets\(\);/);
+    assert.match(text, /export const REMEMBER_PER_TAB = IS_EMULATOR;/);
+    // The emulators are connected only for the emulator target.
+    assert.match(text, /if \(IS_EMULATOR\) connectAuthEmulator\(/);
+    assert.match(text, /if \(IS_EMULATOR\) connectDatabaseEmulator\(/);
   });
 });

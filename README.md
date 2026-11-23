@@ -6,8 +6,9 @@ reveal, protect or deceive. The last player alive wins. There are two modes: **C
 dealt at random) and **Custom** (Classic plus private information, coins and a shop, and
 predictions for eliminated players). Session points add up across the matches played in a room.
 
-The game is in Turkish. It is still in development and runs only against the local Firebase
-emulators for now.
+The game is in Turkish. It is still in development. Served from this machine (localhost) it runs
+against the local Firebase emulators; served from any other host (GitHub Pages) it uses the real
+Firebase project of the game (`src/ui/firebase.js`).
 
 **Tech stack:** plain JavaScript ES modules with no build step and no runtime dependencies; a pure,
 deterministic rules engine; Firebase Realtime Database with security rules, tested on the local
@@ -16,8 +17,8 @@ Firebase Emulator Suite; a plain HTML/CSS/JS interface (`index.html`, `src/ui/`)
 ## Run locally
 
 You need Node.js 24.12 or newer, the Firebase CLI (`npm install -g firebase-tools`) and Java 21 or
-newer (for the database emulator). Everything runs against the local emulators of the demo project
-`demo-mosul-roulette`; no real Firebase project is used.
+newer (for the database emulator). Locally everything runs against the emulators of the demo
+project `demo-mosul-roulette`; the tests never use the real Firebase project.
 
 ```sh
 npm install
