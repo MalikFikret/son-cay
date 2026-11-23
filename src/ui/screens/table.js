@@ -3,9 +3,11 @@
 //
 // Top to bottom: the top bar (round, table code, the live Tablo; Ayarlar / ? disabled for now),
 // the seats around the table with their tea-glass lives and the turn direction, the revolver in
-// the middle, the status line with the countdown and the last move, then my hand (tools shown,
-// not usable yet) and the fire button on my turn, or the "İzliyorsun" strip for a player who is
-// out or a seat that joined during the match. The host sees a kick button on a disconnected
+// the middle, the status line with the countdown and the last move, my effects strip, then my
+// hand and the fire button on my turn, or the "İzliyorsun" strip for a player who is out or a
+// seat that joined during the match. Tools (task 4.3a): a tap on a tool opens its card; a tool
+// with a target is aimed on the table (the pick bar replaces the fire button meanwhile); El
+// Değiştir shows the tool COUNTS on the seats, Çal its own sheet with the victim's tools. The host sees a kick button on a disconnected
 // player's seat (removeAbsentPlayer). After the last shot the end screen (approved mocks 6-8 of
 // conversation 13) replaces the table until the player presses "Salona dön".
 //
@@ -13,6 +15,9 @@
 // Secret aiming: the target I pick stays on this device; it is sent only inside the shot itself
 // (one chooseTarget: the engine's confirmation step is off by default, decision 55). Nothing
 // about the press is sent either. Every device runs the match clock (runMatchClock).
+// Tools follow the same rule: a tool's target leaves this device only inside the tool action,
+// and every secret (my hand, my detection results, El Değiştir's counts, the victim's tools of
+// Çal) is read from this device's own view and private events only, and never written anywhere.
 //
 // Every listener, timer and animation stops in destroy().
 
@@ -23,7 +28,24 @@ import { MODE_LABELS } from '../lobby-model.js';
 import { createSheet } from '../sheet.js';
 import { createTablo } from '../tablo.js';
 import { formatSigned, liveMatchView } from '../tablo-model.js';
-import { toolIcon, toolName } from '../tools.js';
+import { toolHelp, toolIcon, toolName, toolTags } from '../tools.js';
+import {
+  cardButton,
+  chainPartners,
+  doubleMark,
+  effectsStrip,
+  handState,
+  handSwapPick,
+  holdsHand,
+  keepPicks,
+  pickBar,
+  pickStep,
+  stealAction,
+  stealPick,
+  toolAction,
+  toolErrorText,
+  toolTargets,
+} from '../tool-model.js';
 import { revolverSvg, SHOT_TIMING } from '../revolver.js';
 import { LONG_PRESS_MS, PRESS, initialPress, isPressing, pressStep } from '../fire-press.js';
 import {
@@ -96,6 +118,11 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
   let sending = false;
   let angle = NaN;
   let showingEnd = false;
+  // Picking a tool's target(s) on the table (mine only, never sent before the tool itself):
+  // { tool, picks: string[], need, candidates, kind: 'tool' | 'handSwap' } or null.
+  let picking = null;
+  let expanded = null; // the effects strip item shown with its text
+  let stealSeen = null; // the Çal step whose sheet was opened automatically
 
   // --- Static parts --------------------------------------------------------------------------
   const roundTitle = h('span', { class: 'table-round' });
@@ -120,8 +147,10 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
     h('span', { class: 'reload-kicker', text: TEXT.reloadLabel }),
     h('span', { class: 'reload-counts' }, reloadLive, h('span', { class: 'reload-dot', text: '·' }), reloadBlank));
   const reloadLive2 = h('p', { class: 'visually-hidden', role: 'status' }, reloadSr);
-  const stage = h('div', { class: 'table-stage' }, disc, decor, arrows, revolverWrap, reloadBanner);
-  const seatEls = new Map(); // seatId -> { el, tag, name, lives }
+  // Çift Ateş: "×2" by the revolver until the next shot (public; decision 54, never red).
+  const doubleBadge = h('span', { class: 'double-badge', role: 'img', 'aria-label': TEXT.doubleLabel, text: TEXT.doubleMark, hidden: true });
+  const stage = h('div', { class: 'table-stage' }, disc, decor, arrows, revolverWrap, doubleBadge, reloadBanner);
+  const seatEls = new Map(); // seatId -> { el, tag, name, lives, chains, bars }
 
   const statusLine = h('h2', { class: 'table-status-text' });
   const lastLine = h('p', { class: 'table-last' });
@@ -135,15 +164,28 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
   const status = h('section', { class: 'table-status' },
     h('div', { class: 'table-status-main', 'aria-live': 'polite' }, statusLine, lastLine), ring);
 
+  // My own effects (decision 54): shields and detection results, small icons, tap to expand.
+  const effects = h('div', { class: 'effects', role: 'group', 'aria-label': TEXT.effectsLabel, hidden: true });
+  let effectsKey = null;
   const errors = errorLine('table-error');
   const strip = h('p', { class: 'watch-strip', role: 'status', hidden: true });
 
   const handTitle = h('span', { class: 'hand-title' });
+  const handUsed = h('span', { class: 'hand-used' });
   const handList = h('div', { class: 'hand-list' });
   const hand = h('section', { class: 'hand', hidden: true },
-    h('div', { class: 'hand-head' }, handTitle, h('span', { class: 'hand-soon', text: TEXT.handSoon })),
+    h('div', { class: 'hand-head' }, handTitle, handUsed),
     handList);
   let handKey = null;
+
+  // The pick bar (instead of the fire button while a tool's target is picked) and the Çal bar.
+  const stepTitle = h('span', { class: 'step-title' });
+  const stepSub = h('span', { class: 'step-sub' });
+  const stepCancel = h('button', { type: 'button', class: 'btn btn-outline step-cancel', text: TEXT.cancel, on: { click: () => cancelPick() } });
+  const stepGo = h('button', { type: 'button', class: 'btn btn-primary step-go', text: TEXT.use, on: { click: () => onStepGo() } });
+  const stepBar = h('div', { class: 'step-bar', hidden: true, role: 'group' },
+    h('div', { class: 'step-text', 'aria-live': 'polite' }, stepTitle, stepSub),
+    h('div', { class: 'step-actions' }, stepCancel, stepGo));
 
   const fireMain = h('span', { class: 'fire-main' });
   const fireSub = h('span', { class: 'fire-sub' });
@@ -152,7 +194,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
 
   const tableView = h('div', { class: 'table-view' },
     topBar, stage,
-    h('div', { class: 'table-lower' }, status, errors.el, hand, strip, fireWrap),
+    h('div', { class: 'table-lower' }, status, effects, errors.el, hand, strip, stepBar, fireWrap),
     reloadLive2);
 
   // End screen (filled when the match is over).
@@ -231,6 +273,154 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
     kickSheet.open();
   }
 
+  // The tool card (decision 54, approved mock 5): large badge, name, tags, the explanation of
+  // "Nasıl oynanır", this turn's count, "Vazgeç" / "Kullan" (or why it cannot be used now).
+  let cardTool = null;
+  const card = createSheet({ title: '', className: 'tool-card-sheet', onClose: () => { cardTool = null; } });
+  const cardIcon = h('div', { class: 'tool-card-icon' });
+  const cardName = h('p', { class: 'tool-card-name', 'aria-hidden': 'true' });
+  const cardTags = h('div', { class: 'tool-card-tags' });
+  const cardHelp = h('p', { class: 'tool-card-help' });
+  const cardUsed = h('span', { class: 'hint tool-card-used' });
+  const cardWarn = h('p', { class: 'tool-card-warn', role: 'note' });
+  const cardNo = h('button', { type: 'button', class: 'btn btn-outline tool-card-no', text: TEXT.cancel, on: { click: () => card.close() } });
+  const cardYes = h('button', { type: 'button', class: 'btn btn-primary tool-card-yes', on: { click: () => onCardUse() } });
+  card.body.append(h('div', { class: 'tool-card' }, cardIcon, cardName, cardTags, cardHelp, cardUsed, cardWarn,
+    h('div', { class: 'tool-card-actions' }, cardNo, cardYes)));
+
+  function openCard(tool) {
+    if (!applied || !holdsHand(applied.view)) return;
+    if (picking?.kind === 'tool') picking = null;
+    cardTool = tool;
+    cardIcon.replaceChildren(toolIcon(tool, 'large'));
+    cardName.textContent = toolName(tool);
+    card.setTitle(toolName(tool));
+    cardTags.replaceChildren(...toolTags(tool, mode).map((tag) => h('span', { class: 'tool-tag', text: tag })));
+    cardHelp.textContent = toolHelp(tool);
+    renderCard();
+    card.open();
+    renderAll();
+  }
+
+  function renderCard() {
+    if (cardTool === null || !applied) return;
+    const state = cardButton({ view: applied.view, legalActions: applied.legalActions, tool: cardTool });
+    cardUsed.textContent = state.used ?? '';
+    cardUsed.hidden = !state.used;
+    cardWarn.textContent = state.warning ?? '';
+    cardWarn.hidden = !state.warning;
+    cardYes.textContent = sending && state.enabled ? TEXT.toolSending : state.label;
+    cardYes.disabled = !state.enabled || sending;
+  }
+
+  function onCardUse() {
+    if (cardTool === null || !applied || sending) return;
+    const tool = cardTool;
+    if (!cardButton({ view: applied.view, legalActions: applied.legalActions, tool }).enabled) return;
+    const spec = toolTargets(applied.legalActions, tool);
+    card.close();
+    if (spec.need === 0) {
+      sendTool(toolAction(tool));
+      return;
+    }
+    // The target is picked on the table, then confirmed in the pick bar (never sent before).
+    target = null;
+    picking = { tool, picks: [], need: spec.need, candidates: spec.candidates, kind: 'tool' };
+    renderAll();
+  }
+
+  function cancelPick() {
+    if (picking?.kind !== 'tool') return;
+    picking = null;
+    renderAll();
+  }
+
+  function onStepGo() {
+    if (!applied || sending) return;
+    if (stealPick(applied.view)) {
+      openSteal();
+      return;
+    }
+    if (!picking || picking.picks.length < picking.need) return;
+    if (picking.kind === 'handSwap') {
+      sendTool({ type: 'handSwapTarget', target: picking.picks[0] });
+      return;
+    }
+    const action = toolAction(picking.tool, picking.picks);
+    picking = null;
+    if (action) sendTool(action);
+    else renderAll();
+  }
+
+  // Sends one tool action of my own seat (the room layer replaces any playerId with mine).
+  async function sendTool(action) {
+    if (!action || sending) return;
+    sending = true;
+    renderAll();
+    try {
+      const result = await api.submitAction({ uid, code, action });
+      if (!destroyed && !result.ok) showError(toolErrorText(result.error));
+    } catch (error) {
+      report(error);
+    } finally {
+      sending = false;
+      if (!destroyed) renderAll();
+    }
+  }
+
+  // Çal after the look: the victim's tools, shown to me only, from my own view (self.pending).
+  const stealSheet = createSheet({ title: '', className: 'steal-sheet' });
+  const stealBody = h('div', { class: 'steal-body' });
+  const stealNo = h('button', { type: 'button', class: 'btn btn-outline', text: TEXT.stealNothing, on: { click: () => sendSteal(false) } });
+  const stealYes = h('button', { type: 'button', class: 'btn btn-primary', text: TEXT.stealExchange, on: { click: () => sendSteal(true) } });
+  stealSheet.body.append(h('p', { class: 'hint steal-note', text: TEXT.onlyYouSee }), stealBody,
+    h('div', { class: 'dialog-actions' }, stealNo, stealYes));
+  let stealTake = null; // { index, tool } in the victim's list
+  let stealGive = null; // { index, tool } in my hand
+
+  function openSteal() {
+    if (!applied || !stealPick(applied.view)) return;
+    renderSteal();
+    stealSheet.open();
+  }
+
+  function renderSteal() {
+    const pick = applied ? stealPick(applied.view) : null;
+    if (!pick) return;
+    stealSheet.setTitle(TEXT.stealTitle(nameOf(pick.victim)));
+    if (stealTake && pick.tools[stealTake.index] !== stealTake.tool) stealTake = null;
+    if (stealGive && pick.mine[stealGive.index] !== stealGive.tool) stealGive = null;
+    const list = (tools, chosen, choose) => h('div', { class: 'steal-list' }, ...tools.map((tool, index) => h('button', {
+      type: 'button',
+      class: chosen?.index === index ? 'steal-tool is-chosen' : 'steal-tool',
+      'aria-pressed': String(chosen?.index === index),
+      disabled: sending,
+      on: { click: () => { choose(chosen?.index === index ? null : { index, tool }); renderSteal(); } },
+    }, toolIcon(tool, 'small'), h('span', { class: 'hand-name', text: toolName(tool) }))));
+    const parts = [];
+    if (pick.tools.length === 0) {
+      parts.push(h('p', { class: 'muted', text: TEXT.stealVictimEmpty(nameOf(pick.victim)) }));
+    } else {
+      parts.push(h('h3', { class: 'steal-head', text: TEXT.stealTake }), list(pick.tools, stealTake, (c) => { stealTake = c; }));
+      if (pick.mine.length === 0) parts.push(h('p', { class: 'muted', text: TEXT.stealMineEmpty }));
+      else parts.push(h('h3', { class: 'steal-head', text: TEXT.stealGive }), list(pick.mine, stealGive, (c) => { stealGive = c; }));
+    }
+    stealBody.replaceChildren(...parts);
+    stealYes.hidden = pick.tools.length === 0 || pick.mine.length === 0;
+    stealYes.disabled = sending || !stealTake || !stealGive;
+    stealNo.disabled = sending;
+  }
+
+  async function sendSteal(exchange) {
+    const pick = applied ? stealPick(applied.view) : null;
+    if (!pick || sending) return;
+    const action = stealAction({ take: exchange ? stealTake?.tool ?? null : null, give: exchange ? stealGive?.tool ?? null : null, pick });
+    stealSheet.close();
+    stealTake = null;
+    stealGive = null;
+    await sendTool(action);
+  }
+
   // --- Live parts ------------------------------------------------------------------------------
   function report(error) {
     if (destroyed) return;
@@ -297,6 +487,9 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
       round = 0;
       target = null;
       endedAt = null;
+      picking = null;
+      expanded = null;
+      stealSeen = null;
     }
     const shots = shotsIn(update.events);
     if (animate && applied) {
@@ -314,6 +507,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
     applied = update;
     if (shots.length > 0 || !wasMine) target = null;
     target = keepTarget(target, myTargets());
+    syncTools();
     if (update.view.status === 'ended' && endedAt === null) {
       endedAt = Date.now();
       dispatch({ type: 'expire' });
@@ -335,16 +529,59 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
   const clockMs = () => (applied ? msLeft({
     clockAt: applied.clockAt, seconds: applied.view.config.shotTimeSeconds, kind: applied.view.clock.kind, serverNow: Date.now() + offset,
   }) : null);
-  const canFire = () => myTurn() && target !== null && !sending && (clockMs() ?? 1) > 0;
+  const canFire = () => myTurn() && target !== null && !picking && !sending && (clockMs() ?? 1) > 0;
+
+  // After every update: keep the tool steps in line with what the engine now says (my view and
+  // my legal actions only). El Değiştir's pick and the Çal sheet follow view.self.pending.
+  function syncTools() {
+    const { view, legalActions } = applied;
+    const swap = handSwapPick(view, legalActions);
+    if (swap) {
+      const picks = picking?.kind === 'handSwap' ? keepPicks(picking.picks, swap.candidates) : [];
+      target = null;
+      picking = { tool: 'handSwap', picks, need: 1, candidates: swap.candidates, counts: swap.counts, kind: 'handSwap' };
+    } else if (picking?.kind === 'handSwap') {
+      picking = null;
+    } else if (picking) {
+      const spec = toolTargets(legalActions, picking.tool);
+      picking = spec.need === 0 || spec.candidates.length === 0
+        ? null
+        : { ...picking, candidates: spec.candidates, picks: keepPicks(picking.picks, spec.candidates) };
+    }
+    const steal = stealPick(view);
+    if (!steal) {
+      stealSeen = null;
+      stealSheet.close();
+    } else if (stealSeen === null) {
+      // The look just happened: open the choice once (closing it keeps the Çal bar).
+      stealSeen = steal.victim;
+      stealTake = null;
+      stealGive = null;
+      openSteal();
+    } else if (stealSheet.isOpen()) {
+      renderSteal();
+    }
+    if (!holdsHand(view)) {
+      card.close();
+      picking = null;
+    } else {
+      renderCard();
+    }
+  }
 
   function renderAll() {
     if (!applied || destroyed) return;
     const { view } = applied;
     roundTitle.textContent = TEXT.roundTitle(view.round.index);
+    doubleBadge.hidden = doubleMark(view) === null;
     renderSeats(view);
     renderStatus(view);
+    renderEffects(view);
     renderHand(view);
+    renderStep();
     renderFire();
+    renderCard();
+    if (stealSheet.isOpen()) renderSteal();
     pointRevolver(revolverSeat({ target, view }));
     updateClock();
   }
@@ -370,7 +607,9 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
       seat.el.style.left = `${(spot.x / STAGE_WIDTH) * 100}%`;
       seat.el.style.top = `${spot.y}px`;
       const present = isSeatPresent(presence[spot.id]);
-      const tags = seatTags(player, { viewerId: view.viewer, turnId, target, present, out: outs[spot.id], ended: view.status === 'ended' });
+      const tags = seatTags(player, { viewerId: view.viewer, turnId, target, present, out: outs[spot.id], ended: view.status === 'ended', links: view.links });
+      // El Değiştir: the tool COUNT of each player I may swap with (my screen only).
+      if (picking?.kind === 'handSwap' && Number.isInteger(picking.counts?.[spot.id])) tags.push(TEXT.toolCount(picking.counts[spot.id]));
       seat.tag.textContent = tags.join(' · ');
       seat.tag.hidden = tags.length === 0;
       seat.name.textContent = nameOf(spot.id);
@@ -379,17 +618,20 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
         seat.lives.classList.toggle('is-many', view.config.hp > 6);
         seat.lives.replaceChildren(...Array.from({ length: view.config.hp }, (_, i) => svg(i < player.hp ? ICONS.glassFull : ICONS.glassEmpty)));
       }
-      const targetable = mine && !sending && targets.includes(spot.id);
+      const picked = picking !== null && picking.picks.includes(spot.id);
+      const targetable = !sending && (picking ? picking.candidates.includes(spot.id) : mine && targets.includes(spot.id));
       seat.kick.hidden = !canKick({ view, seatId: spot.id, mySeat, hostSeat, present });
+      renderSeatTools(seat, player, view);
       const cls = seat.el.classList;
       cls.toggle('is-me', spot.id === view.viewer);
       cls.toggle('is-turn', spot.id === turnId);
-      cls.toggle('is-target', spot.id === target);
+      // A tool's pick reuses the target red (decision 54); nothing else on the seat turns red.
+      cls.toggle('is-target', spot.id === target || picked);
       cls.toggle('is-out', !player.alive);
       cls.toggle('is-absent', !present && player.alive);
       cls.toggle('is-targetable', targetable);
       seat.main.disabled = !targetable;
-      seat.main.setAttribute('aria-pressed', String(spot.id === target));
+      seat.main.setAttribute('aria-pressed', String(spot.id === target || picked));
       seat.main.setAttribute('aria-label', TEXT.seatLabel(nameOf(spot.id), tags.join(', '), TEXT.livesLabel(player.hp, view.config.hp)));
       seat.kick.setAttribute('aria-label', TEXT.kickFromMatchFor(nameOf(spot.id)));
       seat.spot = spot;
@@ -416,12 +658,48 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
     const main = h('button', { type: 'button', class: 'seat-main' }, tag, name, lives);
     main.addEventListener('click', () => onSeatTap(id));
     const kick = h('button', { type: 'button', class: 'seat-kick', text: TEXT.kickFromMatch, hidden: true, on: { click: () => askKick(id) } });
-    const el = h('div', { class: 'seat' }, main, kick);
-    return { el, main, kick, tag, name, lives, hp: null, spot: null };
+    // Hapis: bars in the corner (decision 54). Zincir: one badge per link (decision 58).
+    const bars = h('span', { class: 'seat-bars', 'aria-hidden': 'true', hidden: true }, svg(JAIL_BARS));
+    const chains = h('div', { class: 'seat-chains', hidden: true });
+    const el = h('div', { class: 'seat' }, bars, main, chains, kick);
+    return { el, main, kick, tag, name, lives, bars, chains, chainKey: null, hp: null, spot: null };
+  }
+
+  // The public tool marks of a seat: jail bars and the chain badges with the other player's name.
+  function renderSeatTools(seat, player, view) {
+    const active = view.status === 'active' && player.alive;
+    seat.bars.hidden = !(active && player.jailed);
+    seat.el.classList.toggle('is-jailed', active && player.jailed);
+    const partners = active
+      ? chainPartners(view.links, player.id).filter((id) => view.players.some((p) => p.id === id && p.alive))
+      : [];
+    const key = partners.map((id) => `${id}=${nameOf(id)}`).join('|');
+    if (key === seat.chainKey) return;
+    seat.chainKey = key;
+    seat.chains.hidden = partners.length === 0;
+    seat.chains.replaceChildren(...partners.map((other) => h('button', {
+      type: 'button', class: 'seat-chain', 'aria-label': TEXT.chainWith(nameOf(other)), on: { click: () => flashSeat(other) },
+    }, svg(CHAIN), h('span', { class: 'seat-chain-name', text: nameOf(other) }))));
+  }
+
+  // A tap on a chain badge lights the other seat for a moment.
+  function flashSeat(id) {
+    const seat = seatEls.get(id);
+    if (!seat) return;
+    seat.el.classList.remove('is-flash');
+    void seat.el.offsetWidth;
+    seat.el.classList.add('is-flash');
+    later(() => seat.el.classList.remove('is-flash'), 1300, `flash-${id}`);
   }
 
   function onSeatTap(id) {
-    if (!myTurn() || sending || isPressing(press)) return;
+    if (sending || isPressing(press)) return;
+    if (picking) {
+      picking = { ...picking, picks: pickStep(picking.picks, id, picking) };
+      renderAll();
+      return;
+    }
+    if (!myTurn()) return;
     target = tapTarget(target, id, myTargets());
     renderAll();
   }
@@ -443,21 +721,93 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
     strip.textContent = watching ?? '';
   }
 
+  // My hand (decision 54): small badges on every turn, turn tools faded on others' turns, and on
+  // my turn "bu sıra N/M". A tap opens the tool's card (no long press).
   function renderHand(view) {
-    const tools = view.role === 'alive' && view.status === 'active' ? view.self?.hand ?? [] : null;
-    hand.hidden = tools === null;
-    if (tools === null) return;
-    const key = tools.join(',');
+    const state = handState(view);
+    hand.hidden = state === null;
+    if (state === null) return;
+    handTitle.textContent = state.title;
+    handUsed.textContent = state.used ?? '';
+    const key = JSON.stringify(state.tools);
     if (key === handKey) return;
     handKey = key;
-    handTitle.textContent = tools.length > 0 ? TEXT.handTitle(tools.length) : TEXT.handEmpty;
-    handList.replaceChildren(...tools.map((tool) => h('button', {
-      type: 'button', class: 'hand-tool', disabled: true, 'aria-label': toolName(tool),
-    }, toolIcon(tool, 'small'), h('span', { class: 'hand-name', text: toolName(tool) }))));
+    handList.replaceChildren(...state.tools.map((item) => h('button', {
+      type: 'button',
+      class: item.faded ? 'hand-tool is-faded' : 'hand-tool',
+      'aria-label': item.name,
+      'aria-haspopup': 'dialog',
+      on: { click: () => openCard(item.tool) },
+    }, toolIcon(item.tool, 'small'), h('span', { class: 'hand-name', text: item.name }))));
+  }
+
+  // My effects strip (decision 54): icons only; a tap expands one item with its text, a tap
+  // anywhere else closes it. Built from my own view and private events only.
+  function renderEffects(view) {
+    const items = effectsStrip(view, events);
+    if (!items.some((item) => item.key === expanded)) expanded = null;
+    const key = JSON.stringify([items, expanded]);
+    if (key === effectsKey) return;
+    effectsKey = key;
+    effects.hidden = items.length === 0;
+    effects.replaceChildren(...items.map((item) => {
+      const open = item.key === expanded;
+      const { name, text, strong, after } = item.text;
+      const icon = toolIcon(item.tool, 'small');
+      if (item.faded) icon.classList.add('is-faded');
+      return h('button', {
+        type: 'button',
+        class: open ? 'effect is-open' : 'effect',
+        'aria-expanded': String(open),
+        'aria-label': open ? `${name}${text}${strong}${after}` : name,
+        on: {
+          click: (event) => {
+            event.stopPropagation();
+            expanded = open ? null : item.key;
+            renderEffects(applied.view);
+          },
+        },
+      }, icon, open ? h('span', { class: 'effect-text' },
+        h('strong', { text: name }), text, strong ? h('strong', { text: strong }) : null, after) : null);
+    }));
+  }
+
+  const closeEffects = (event) => {
+    if (expanded === null || effects.contains(event.target) || !applied) return;
+    expanded = null;
+    renderEffects(applied.view);
+  };
+  document.addEventListener('click', closeEffects);
+
+  // The pick bar (a tool's target, then the short confirmation) and the Çal bar, in place of the
+  // fire button.
+  function renderStep() {
+    const steal = applied ? stealPick(applied.view) : null;
+    if (steal) {
+      stepBar.hidden = false;
+      stepTitle.textContent = toolName('steal');
+      stepSub.textContent = nameOf(steal.victim);
+      stepCancel.hidden = true;
+      stepGo.textContent = sending ? TEXT.toolSending : TEXT.stealPending;
+      stepGo.disabled = sending;
+      return;
+    }
+    if (!picking) {
+      stepBar.hidden = true;
+      return;
+    }
+    const bar = pickBar({ tool: picking.tool, picks: picking.picks, need: picking.need, nameOf, mySeat });
+    stepBar.hidden = false;
+    stepTitle.textContent = bar.title;
+    stepSub.textContent = bar.sub;
+    stepCancel.hidden = picking.kind === 'handSwap'; // El Değiştir is already spent
+    stepCancel.disabled = sending;
+    stepGo.textContent = sending ? TEXT.toolSending : TEXT.use;
+    stepGo.disabled = sending || !bar.ready;
   }
 
   function renderFire() {
-    const show = myTurn();
+    const show = myTurn() && !picking;
     fireWrap.hidden = !show;
     if (!show) return;
     const pressing = isPressing(press);
@@ -707,6 +1057,9 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
       destroyed = true;
       tablo.destroy();
       kickSheet.destroy();
+      card.destroy();
+      stealSheet.destroy();
+      document.removeEventListener('click', closeEffects);
       clearInterval(tick);
       for (const id of timers) clearTimeout(id);
       timers.clear();
@@ -728,6 +1081,16 @@ const DECOR = ['svg', { class: 'table-decor', width: 248, height: 248, viewBox: 
   ['rect', { x: 64, y: 64, width: 120, height: 120, fill: 'none', stroke: '#3FB5AC', 'stroke-opacity': 0.35, 'stroke-width': 1.5 }],
   ['rect', { x: 64, y: 64, width: 120, height: 120, fill: 'none', stroke: '#3FB5AC', 'stroke-opacity': 0.35, 'stroke-width': 1.5, transform: 'rotate(45 124 124)' }],
   ['circle', { cx: 124, cy: 124, r: 46, fill: '#1E1814', stroke: '#3FB5AC', 'stroke-opacity': 0.5, 'stroke-width': 1 }]];
+
+// Hapis on a seat: bars in the corner (approved mock 3 of conversation 13).
+const JAIL_BARS = ['svg', { width: 22, height: 22, viewBox: '0 0 22 22', 'aria-hidden': 'true' },
+  ['rect', { x: 2, y: 2, width: 18, height: 18, rx: 3, fill: 'none', stroke: '#EFE6D6', 'stroke-opacity': 0.8, 'stroke-width': 1.5 }],
+  ['path', { d: 'M7 2 V20 M11 2 V20 M15 2 V20', stroke: '#EFE6D6', 'stroke-opacity': 0.8, 'stroke-width': 1.5 }]];
+
+// The chain badge's two links (approved mock 3 of conversation 13, decision 58).
+const CHAIN = ['svg', { width: 14, height: 12, viewBox: '0 0 14 12', fill: 'none', stroke: '#EFE6D6', 'stroke-width': 1.5, 'aria-hidden': 'true' },
+  ['rect', { x: 0.8, y: 3, width: 7, height: 6, rx: 3 }],
+  ['rect', { x: 6.2, y: 3, width: 7, height: 6, rx: 3 }]];
 
 const GEAR = ['svg', { width: 20, height: 20, viewBox: '0 0 24 24', fill: 'none', stroke: '#EFE6D6', 'stroke-width': 1.8, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' },
   ['circle', { cx: 12, cy: 12, r: 3.2 }],

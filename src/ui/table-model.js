@@ -7,6 +7,7 @@
 
 import { TEXT } from './messages.js';
 import { toolName } from './tools.js';
+import { toolTagsOf } from './tool-model.js';
 
 /** The table is designed on a 390 px wide stage; positions are in these units. */
 export const STAGE_WIDTH = 390;
@@ -203,9 +204,10 @@ export function lastRound(events, previous = 0) {
  * The small tags of a seat, in display order.
  * @param {{ id: string, alive: boolean }} player
  * @param {{ viewerId: string | null, turnId: string | null, target: string | null,
- *   present: boolean, out?: { round: number, removed: boolean } }} info
+ *   present: boolean, out?: { round: number, removed: boolean }, ended?: boolean,
+ *   links?: string[][] }} info  links = view.links: a linked seat shows 'zincirli', a jailed one 'hapiste'
  */
-export function seatTags(player, { viewerId, turnId, target, present, out, ended = false }) {
+export function seatTags(player, { viewerId, turnId, target, present, out, ended = false, links = [] }) {
   const tags = [];
   if (player.id === viewerId) tags.push(TEXT.tagMe);
   if (!player.alive) {
@@ -214,6 +216,7 @@ export function seatTags(player, { viewerId, turnId, target, present, out, ended
   }
   if (player.id === target) tags.push(TEXT.tagTarget);
   else if (!ended && player.id === turnId && player.id !== viewerId) tags.push(TEXT.tagTurn);
+  if (!ended) tags.push(...toolTagsOf(player, links));
   if (!present) tags.push(TEXT.tagAbsent);
   return tags;
 }
@@ -243,7 +246,13 @@ export function lastMove(events, nameOf) {
   }
   const e = list[index];
   if (e.type === 'playerRemoved') return { lead: TEXT.playerRemovedLine(nameOf(e.player)), effect: null, tail: '' };
-  if (e.type === 'toolUsed') return { lead: TEXT.toolUsedLine(nameOf(e.by), toolName(e.tool)), effect: null, tail: '' };
+  if (e.type === 'toolUsed') {
+    const blocked = [];
+    for (let i = index + 1; i < list.length && !MOVE_TYPES.includes(list[i].type); i += 1) {
+      if (list[i].type === 'toolBlocked' && Array.isArray(list[i].blockedBy)) blocked.push(...list[i].blockedBy.map(nameOf));
+    }
+    return { lead: toolUsedLine(e, nameOf), effect: null, tail: blocked.length > 0 ? TEXT.toolBlockedTail(blocked.join(TEXT.and)) : '' };
+  }
   if (e.type === 'turnSkipped') return { lead: TEXT.turnSkippedLine(nameOf(e.player)), effect: null, tail: '' };
   let lead;
   if (e.auto) lead = TEXT.shotOnTimeout(nameOf(e.shooter));
@@ -254,6 +263,18 @@ export function lastMove(events, nameOf) {
     if (list[i].type === 'eliminated') out.push(TEXT.playerOut(nameOf(list[i].player)));
   }
   return { lead, effect: e.effect === 'live' ? 'live' : 'blank', tail: out.join(' ') };
+}
+
+/**
+ * One announced tool use (public toolUsed only): Zincir with both names, Hapis / Çal / El
+ * Değiştir with the other player's name (Çal never says which tools moved; an El Değiştir that
+ * timed out has no name). Names are never put inside a Turkish word.
+ */
+export function toolUsedLine(e, nameOf) {
+  let detail = '';
+  if (e.tool === 'link' && Array.isArray(e.targets) && e.targets.length === 2) detail = e.targets.map(nameOf).join(TEXT.and);
+  else if ((e.tool === 'jail' || e.tool === 'steal' || e.tool === 'handSwap') && typeof e.target === 'string') detail = nameOf(e.target);
+  return TEXT.toolLine(nameOf(e.by), toolName(e.tool), detail);
 }
 
 // --- Reload announcement -----------------------------------------------------------------------

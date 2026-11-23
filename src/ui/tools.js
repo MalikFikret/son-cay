@@ -33,6 +33,58 @@ export const TOOL_NAMES = Object.freeze({
   heal: 'Pansuman',
 });
 
+/**
+ * tool id -> the approved one- or two-line explanation, copied as it is from the approved
+ * "Nasıl oynanır · Malzemeler" mock (conversation 11, model 2). The tool card on the table uses
+ * it now; "Nasıl oynanır" will use the same texts.
+ */
+export const TOOL_HELP = Object.freeze({
+  detector: 'Şu anki merminin dolu mu boş mu olduğunu yalnız sana gösterir.',
+  probe: 'Şu anki mermiyle bir sonrakinin aynı mı, farklı mı olduğunu söyler.',
+  counter: 'Şu anki mermi ve sonraki ikisi içinde kaç dolu olduğunu söyler. Üçten az mermi kaldıysa kalanları sayar.',
+  skip: 'Şu anki mermiyi ateşlemeden bir sonrakine geçersin, sıra sende kalır. Geçtiğin mermiyi yalnız sen görürsün.',
+  swap: 'Şu anki mermiyle bir sonrakinin yerini, ikisini de açmadan değiştirir.',
+  flip: 'Şu anki mermiyi ters çalıştırır: dolu boş gibi, boş dolu gibi patlar. Herkes görünen sonucu sanar.',
+  shuffle: 'Kalan mermilerin sırasını rastgele karıştırır.',
+  double: 'Sonraki atış dolu çıkarsa iki bardak (can) götürür.',
+  reverse: 'Sıranın dönüş yönünü tersine çevirir.',
+  link: 'İki oyuncuyu tur sonuna kadar bağlar: birine gelen hasar ötekine de gelir. Kendini de bağlayabilirsin.',
+  jail: 'Seçtiğin oyuncunun bir sonraki sırası atlanır. Biri ondan fidye olarak bir malzeme kabul ederse çıkar.',
+  handSwap: 'Bütün malzemelerini başka bir oyuncunun malzemeleriyle değiştirirsin.',
+  steal: 'Bir oyuncunun malzemelerine bakar, birini alıp yerine kendinden birini verirsin. Baktığın anda harcanır.',
+  shotShield: 'Bu turda sana gelen ilk dolu mermiyi durdurur ve ateşleyene geri yollar. Bir sonraki sıradan itibaren çalışır.',
+  toolShield: 'Bu turda sana karşı kullanılan ilk malzemeyi boşa çıkarır. Bir sonraki sıradan itibaren çalışır.',
+  heal: 'Bir bardak geri kazanırsın. Başlangıçtaki bardak sayısını geçemezsin.',
+});
+
+/** The approved tags of the same mock: when a tool can be used and who sees it. */
+export const TOOL_TAG_TEXT = Object.freeze({
+  hidden: 'gizli',
+  announced: 'herkes görür',
+  stealAnnounced: 'herkes görür · ne aldığın gizli',
+  turn: 'sıranda',
+  anytime: 'her an',
+});
+
+/**
+ * The tags of a tool's card in a mode: timing first ("sıranda" / "her an"), then visibility
+ * ("gizli" / "herkes görür"; Çal "herkes görür · ne aldığın gizli"). Kaydır is hidden only in
+ * Classic (engine TOOL_INFO hidden 'classic').
+ */
+export function toolTags(tool, mode = 'classic') {
+  if (!isTool(tool)) return [];
+  const info = TOOL_INFO[tool];
+  const hidden = info.hidden === 'always' || (info.hidden === 'classic' && mode === 'classic');
+  let visibility = hidden ? TOOL_TAG_TEXT.hidden : TOOL_TAG_TEXT.announced;
+  if (tool === 'steal') visibility = TOOL_TAG_TEXT.stealAnnounced;
+  return [info.timing === 'anytime' ? TOOL_TAG_TEXT.anytime : TOOL_TAG_TEXT.turn, visibility];
+}
+
+/** The explanation of a tool, or '' for anything that is not a tool id. */
+export function toolHelp(tool) {
+  return isTool(tool) ? TOOL_HELP[tool] : '';
+}
+
 export const FRAME_TURQUOISE = '#3FB5AC';
 export const FRAME_COPPER = '#D6804A';
 export const ICON_SIZES = Object.freeze(['large', 'small']);
