@@ -4,6 +4,8 @@
 //   #/                    Giriş (home)
 //   #/yeni                create a table
 //   #/hakkinda            Hakkında (about)
+//   #/nasil               Nasıl oynanır, tab Kurallar (how to play, decision Q73)
+//   #/nasil/malzemeler    Nasıl oynanır, tab Malzemeler
 //   #/masa/CODE           the table: the seat screen for a member, else "Masaya otur" (join).
 //                         This is also the invite link.
 //   #/masa/CODE/don       Yerine dön (recover my seat)
@@ -16,6 +18,7 @@ export const ROUTES = Object.freeze({
   HOME: 'home',
   CREATE: 'create',
   ABOUT: 'about',
+  HOW_TO: 'howTo',
   TABLE: 'table',
   RECOVER: 'recover',
   /** A hash that names a table with an invalid code (e.g. a mangled invite link). */
@@ -26,11 +29,17 @@ export const ROUTES = Object.freeze({
 
 const TABLE_SEGMENT = 'masa';
 const RECOVER_SEGMENT = 'don';
+const HOW_TO_SEGMENT = 'nasil';
+const TOOLS_SEGMENT = 'malzemeler';
+
+/** The tabs of Nasıl oynanır. */
+export const HOW_TO_TABS = Object.freeze({ RULES: 'rules', TOOLS: 'tools' });
 
 export const hashFor = Object.freeze({
   home: () => '#/',
   create: () => '#/yeni',
   about: () => '#/hakkinda',
+  howTo: (tab = HOW_TO_TABS.RULES) => (tab === HOW_TO_TABS.TOOLS ? `#/${HOW_TO_SEGMENT}/${TOOLS_SEGMENT}` : `#/${HOW_TO_SEGMENT}`),
   table: (code) => `#/masa/${checkedCode(code)}`,
   recover: (code) => `#/masa/${checkedCode(code)}/${RECOVER_SEGMENT}`,
 });
@@ -66,6 +75,10 @@ export function parseRoute(hash) {
 
   if (parts.length === 1 && parts[0] === 'yeni') return { name: ROUTES.CREATE };
   if (parts.length === 1 && parts[0] === 'hakkinda') return { name: ROUTES.ABOUT };
+  if (parts[0] === HOW_TO_SEGMENT && parts.length === 1) return { name: ROUTES.HOW_TO, tab: HOW_TO_TABS.RULES };
+  if (parts[0] === HOW_TO_SEGMENT && parts.length === 2 && parts[1] === TOOLS_SEGMENT) {
+    return { name: ROUTES.HOW_TO, tab: HOW_TO_TABS.TOOLS };
+  }
 
   if (parts[0] === TABLE_SEGMENT && (parts.length === 2 || parts.length === 3)) {
     const raw = safeDecode(parts[1]);

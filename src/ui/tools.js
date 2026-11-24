@@ -1,6 +1,6 @@
 // The tools (malzemeler) as the player sees them: their names, explanations and tags (from the
 // locale) and the approved badge icons, for every screen: the waiting room, the hand, the tool
-// card; "Nasıl oynanır" will reuse them. The engine only knows the English ids (TOOL_IDS).
+// card and "Nasıl oynanır". The engine only knows the English ids (TOOL_IDS).
 //
 // Icons: round badges, viewBox 80, background #1E1814, drawing in #EFE6D6 on a 48 grid moved by
 // 16. Frame turquoise (#3FB5AC), copper (#D6804A) for the three tools usable at any time (the
@@ -15,7 +15,7 @@ import { svg } from './dom.js';
 import { t } from './i18n/i18n.js';
 
 // The approved names, explanations ("Nasıl oynanır · Malzemeler" mock, conversation 11 model 2;
-// the tool card uses them now, "Nasıl oynanır" will too) and card tags are locale entries keyed by
+// the tool card and "Nasıl oynanır" use them) and card tags are locale entries keyed by
 // tool id: tools.names / tools.help / tools.tags in src/ui/i18n/.
 
 /**

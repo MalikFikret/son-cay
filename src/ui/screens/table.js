@@ -116,10 +116,11 @@ const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(pre
  *   onBack: "Salona dön" was pressed on the end screen;
  *   onCloseRoom: the host confirmed "Masayı kapat" (decision Q67; shown to the host only, enabled
  *   during a match only while every other seat is absent: setRoom's closeRoom state);
- *   onHome: "⋮ > Ana sayfa" (decision Q70): go to Giriş, keeping the seat
+ *   onHome: "⋮ > Ana sayfa" (decision Q70): go to Giriş, keeping the seat;
+ *   onHowTo: "⋮ > Nasıl oynanır" (decision Q73): open that page, keeping the seat
  * @returns {{ el: HTMLElement, setRoom(room: object): void, isEnded(): boolean, destroy(): void }}
  */
-export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, onLost, onBack, onCloseRoom, onHome }) {
+export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, onLost, onBack, onCloseRoom, onHome, onHowTo }) {
   let destroyed = false;
   const stops = [];
   const timers = new Set();
@@ -158,8 +159,8 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
   // --- Static parts --------------------------------------------------------------------------
   // "⋮" (decision Q70): an in-page menu with "Ana sayfa" (navigation only: the seat, presence
   // and the match are untouched), "Dil / Language" (decision Q71: switches to the next language
-  // on this device; the screen is drawn again, the seat, turn and timer go on) and the not yet
-  // built "Ayarlar" / "Nasıl oynanır".
+  // on this device; the screen is drawn again, the seat, turn and timer go on), "Nasıl oynanır"
+  // (decision Q73: navigation only, like "Ana sayfa") and the not yet built "Ayarlar".
   const menuButton = h('button', {
     type: 'button', class: 'table-top-button is-square table-menu-button', 'aria-label': t('away.tableMenu'),
     'aria-haspopup': 'menu', 'aria-expanded': 'false', 'aria-controls': 'table-menu',
@@ -179,7 +180,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
       onClick: () => { closeMenu(); setLanguage(nextLanguage()); },
     }),
     menuItem(t('common.settings'), { disabled: true }),
-    menuItem(t('common.howToPlay'), { disabled: true }));
+    menuItem(t('common.howToPlay'), { onClick: () => { closeMenu(); if (onHowTo) onHowTo(); } }));
   const menuWrap = h('div', { class: 'table-menu-wrap' }, menuButton, menu);
 
   function openMenu() {

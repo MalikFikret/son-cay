@@ -476,6 +476,7 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
       onBack: backToLobby,
       onCloseRoom: closeRoom,
       onHome: () => ctx.go(hashFor.home()),
+      onHowTo: () => ctx.go(hashFor.howTo()),
     });
     tableSawLobby = false;
     lobbyPart.hidden = true;

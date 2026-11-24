@@ -6,7 +6,7 @@
 // table was closed, its "Masa kapatıldı" notice is shown first).
 //
 // Away from the table (decision Q70): the seat keeper (seat-keeper.js) keeps this tab's seat
-// present while it shows another screen (Giriş with its "Masaya dön" bar, Hakkında). While seated,
+// present while it shows another screen (Giriş with its "Masaya dön" bar, Hakkında, Nasıl oynanır). While seated,
 // another table cannot be created, joined or recovered ("Önce masana dön").
 
 import { replace } from './dom.js';
@@ -19,6 +19,7 @@ import { errorMessage } from './messages.js';
 import { initLanguage, onLanguageChange, t } from './i18n/i18n.js';
 import { ROUTES, hashFor, parseRoute } from './routes.js';
 import { aboutScreen } from './screens/about.js';
+import { howToScreen } from './screens/howto.js';
 import { ROOM_CLOSED_MS, closedScreen } from './screens/closed.js';
 import { homeScreen } from './screens/home.js';
 import { problemScreen } from './screens/problem.js';
@@ -73,6 +74,14 @@ const ctx = {
   onSeatProblem(error) {
     seatProblem(error);
   },
+  /**
+   * Back from Nasıl oynanır (decision Q73): to the screen it was opened from (one history step:
+   * its tabs never add an entry), or Giriş if this tab opened it directly (e.g. a reload).
+   */
+  howToBack() {
+    if (howToOpenedFrom !== null) history.back();
+    else ctx.go(hashFor.home());
+  },
   /** Draws the current route again, with an optional message on the screen it shows. */
   refresh(message) {
     flash = message ?? null;
@@ -88,6 +97,10 @@ let flashInfo = false; // the flash confirms something (neutral style on Giriş)
 // Each rendered screen gets a view: `active()` turns false as soon as another screen replaces
 // it, so late answers of the database never touch the page or navigate.
 let currentView = null;
+
+// The route shown before Nasıl oynanır was opened (null: opened directly, e.g. after a reload).
+let lastRouteName = null;
+let howToOpenedFrom = null;
 
 function startView() {
   if (currentView) {
@@ -137,8 +150,14 @@ async function seatProblem(error) {
   ctx.keeper.release();
   if (rememberedCode() === held.code) forgetCode();
   const gone = error.code === ROOM_ERR.ROOM_NOT_FOUND || (await roomGone(held.code));
-  // Only Giriş shows anything about it (its bar); other screens simply forget the table.
-  if (parseRoute(location.hash).name !== ROUTES.HOME) return;
+  // Only Giriş shows anything about it (its bar); Nasıl oynanır drops its bar; other screens
+  // simply forget the table.
+  const shown = parseRoute(location.hash).name;
+  if (shown === ROUTES.HOW_TO) {
+    route();
+    return;
+  }
+  if (shown !== ROUTES.HOME) return;
   if (gone) showRoomClosed(held.code);
   else goHome(errorMessage(ROOM_ERR.SEAT_LOST));
 }
@@ -214,6 +233,9 @@ function canonicalize(hash) {
 function route() {
   const view = startView();
   const current = parseRoute(location.hash);
+  if (current.name === ROUTES.HOW_TO && lastRouteName !== ROUTES.HOW_TO) howToOpenedFrom = lastRouteName;
+  if (current.name !== ROUTES.HOW_TO) howToOpenedFrom = null;
+  lastRouteName = current.name;
   switch (current.name) {
     case ROUTES.HOME: {
       const message = flash;
@@ -230,6 +252,9 @@ function route() {
       return;
     case ROUTES.ABOUT:
       show(aboutScreen(ctx, view), 'app.titleAbout');
+      return;
+    case ROUTES.HOW_TO:
+      show(howToScreen(ctx, view, { tab: current.tab }), 'app.titleHowTo');
       return;
     case ROUTES.TABLE:
       if (blockedByOwnTable('join', current.code)) return;
