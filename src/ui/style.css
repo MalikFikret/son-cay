@@ -591,8 +591,6 @@ a.btn-outline:hover { color: var(--text); background-color: rgba(239, 230, 214, 
 
 /* --- Nasıl oynanır (decision Q73; approved mocks: conversation 11, models 1 and 2) --------- */
 
-.howto-bar { padding: 12px 18px 0; }
-
 .howto {
   display: flex;
   flex-direction: column;

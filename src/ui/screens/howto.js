@@ -79,7 +79,8 @@ export function howToScreen(ctx, view, { tab = HOW_TO_TABS.RULES } = {}) {
   }
 
   draw();
-  return screen('screen-howto', bar ? h('div', { class: 'howto-bar' }, bar) : null, top.el,
+  // The bar sits exactly as on Giriş (full width, no gutter), so it stays on one line at 360 px.
+  return screen('screen-howto', bar, top.el,
     h('div', { class: 'howto' }, tabList, panel));
 }
 

@@ -130,6 +130,13 @@ describe('the Kurallar tab', () => {
     }
   });
 
+  test('copper items: free of the turn limit only on someone else\'s turn (as the engine counts)', () => {
+    assert.equal(tr.howTo.itemsNote(3), 'Sırandayken masanın izin verdiği sayıya kadar (genelde 3) kullanırsın. Bakır çerçeveliler her an kullanılır; başkasının sırasında kullanırsan bu sayıdan düşmez.');
+    assert.equal(en.howTo.itemsNote(3), "On your turn you can use as many as the table allows (usually 3). Copper-framed items can be used at any time; used on someone else's turn, they don't count toward that limit.");
+    assert.match(tr.howTo.legendAnytime, /başkasının sırasında kullanırsan/);
+    assert.match(en.howTo.legendAnytime, /used on someone else's turn/);
+  });
+
   test('the approved Q73 additions are there, word for word', () => {
     assert.equal(tr.howTo.turnAiming, 'Hedefini yalnız sen görürsün, ateşlenene kadar kimse bilmez. Kısa bas: hemen ateşler. Basılı tut: horoz çekilir, parmağını kaldırınca ateşler. Vazgeçmek için parmağını düğmenin dışına kaydır.');
     assert.equal(tr.howTo.timeHold, 'Düğmeye basılı tutarken süre biterse de tabanca kendine ateşlenir.');
