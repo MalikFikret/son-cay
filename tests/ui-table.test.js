@@ -21,8 +21,6 @@ import {
   outRounds,
   placeSeats,
   pointsLeft,
-  reloadFor,
-  reloadText,
   revolverSeat,
   seatLayout,
   seatSizeFor,
@@ -253,25 +251,6 @@ describe('the fire button press', () => {
   test('a second finger while pressing changes nothing', () => {
     const first = down(initialPress(), 0).state;
     assert.equal(down(first, 50).state, first);
-  });
-});
-
-describe('the reload announcement', () => {
-  test('shows the announced counts only: "3 Dolu · 3 Boş"', () => {
-    assert.deepEqual(reloadText({ live: 3, blank: 3, total: 6 }), { live: '3 Dolu', blank: '3 Boş', text: '3 Dolu · 3 Boş' });
-    assert.equal(reloadText({ live: 2, blank: 5 }).text, '2 Dolu · 5 Boş');
-    assert.doesNotMatch(reloadText({ live: 4, blank: 1, total: 5 }).text, /5/);
-    assert.equal(reloadText(null), null);
-    assert.equal(reloadText({ live: 'x', blank: 1 }), null);
-  });
-
-  test('comes with a reloaded event, and at the start of a round when the page is (re)opened', () => {
-    const view = (shots, status = 'active') => ({ status, round: { index: 2, shots, announced: { total: 5, live: 2, blank: 3 } } });
-    assert.equal(reloadFor({ initial: true, view: view(0), events: [] }).text, '2 Dolu · 3 Boş');
-    assert.equal(reloadFor({ initial: true, view: view(1), events: [] }), null, 'mid-round reload of the page');
-    assert.equal(reloadFor({ initial: false, view: view(0), events: [pub('shot'), pub('reloaded', { round: 3, total: 4, live: 1, blank: 3 })] }).text, '1 Dolu · 3 Boş');
-    assert.equal(reloadFor({ initial: false, view: view(2), events: [pub('shot')] }), null);
-    assert.equal(reloadFor({ initial: false, view: view(0, 'ended'), events: [pub('reloaded', { live: 1, blank: 1 })] }), null);
   });
 });
 

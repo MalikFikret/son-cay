@@ -2308,79 +2308,135 @@ li.tablo-row { min-height: 56px; }
   100% { opacity: 0; }
 }
 
-/* Reload announcement: a moment in the middle of the table, then gone. */
-/* The round intro PLACEHOLDER (step 4.4d-a, decision Q79); the real screen comes next. */
-.intro-placeholder {
-  position: absolute;
-  left: 50%;
-  top: var(--cy, 50%);
-  transform: translate(-50%, -50%);
-  z-index: 6;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 12px 20px;
-  border-radius: 14px;
-  background-color: rgba(21, 16, 12, 0.92);
-  border: 1px solid var(--line);
-  text-align: center;
-}
-
-.intro-placeholder[hidden] { display: none; }
-.intro-placeholder-title { font-family: 'Rakkas', serif; font-size: 28px; color: var(--text); }
-.intro-placeholder-counts { font-size: 14px; color: var(--muted); }
-
 /* A round pause (decision Q79): the hand, loot and Fidye controls take no taps. */
 .table-screen.is-paused .hand,
 .table-screen.is-paused .loot-card button,
 .table-screen.is-paused .ransom-row button { pointer-events: none; }
 
-.reload-banner {
-  position: absolute;
-  z-index: 3;
-  left: 50%;
-  top: var(--cy);
-  transform: translate(-50%, -50%);
-  padding: 10px 20px 12px;
-  border-radius: 14px;
-  border: 1px solid rgba(63, 181, 172, 0.6);
-  background-color: rgba(21, 16, 12, 0.94);
-  box-shadow: 0 0 24px rgba(63, 181, 172, 0.35);
+/* The round intro, "Tur girişi" (step 4.4d-b, decision Q79; approved mock: conversation 23,
+   model 1): a full screen over the table during the intro. Dolu / Boş in the reload colours;
+   never red (decision 54). */
+.round-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 440px;
+  margin: 0 auto;
+  box-sizing: border-box;
+  padding: 14px 18px 22px;
+  padding-bottom: max(22px, env(safe-area-inset-bottom));
+  background: var(--bg) url('pattern.svg') repeat;
+  color: var(--text);
+  animation: round-intro-in 0.22s ease-out both;
+}
+
+.round-intro.is-leaving { animation: round-intro-out 0.2s ease-in both; pointer-events: none; }
+
+/* While the intro shows, the table under it is not drawn (it is replaced, not covered). */
+.table-screen.is-intro .table-view { visibility: hidden; }
+
+.round-intro-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.round-intro-body {
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  white-space: nowrap;
-  pointer-events: none;
+  justify-content: center;
+  gap: 14px;
+  text-align: center;
 }
 
-.reload-banner.is-showing { animation: reload-show 2.2s ease both; }
-
-.reload-kicker {
-  font-size: 10px;
-  letter-spacing: 0.06em;
+.round-intro-kicker {
+  font-size: 11px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
 }
 
-.reload-counts {
+.round-intro-round {
+  font-family: var(--font-display);
+  font-size: 76px;
+  line-height: 0.9;
+}
+
+.round-intro-dots {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 9px;
+  max-width: 300px;
+  margin-top: 14px;
+}
+
+.round-intro-bullet {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
+.round-intro-bullet.is-live { background-color: #F08A7E; }
+.round-intro-bullet.is-blank { border: 2px solid #8FDAD3; }
+.round-intro-gap { width: 8px; }
+
+.round-intro-total { font-size: 15px; }
+
+.round-intro-counts {
   display: flex;
   gap: 10px;
   font-family: var(--font-display);
-  font-size: 28px;
+  font-size: 30px;
   line-height: 1;
 }
 
-.reload-live { color: #F08A7E; }
-.reload-blank { color: #8FDAD3; }
-.reload-dot { color: var(--muted); }
+.round-intro-live { color: #F08A7E; }
+.round-intro-blank { color: #8FDAD3; }
+.round-intro-sep { color: var(--muted); }
 
-@keyframes reload-show {
-  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
-  12% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-  85% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-  100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
+.round-intro-first {
+  margin-top: 18px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.round-intro-bar {
+  position: relative;
+  height: 3px;
+  border-radius: 2px;
+  overflow: hidden;
+  background-color: rgba(239, 230, 214, 0.15);
+}
+
+.round-intro-fill {
+  position: absolute;
+  inset: 0;
+  border-radius: 2px;
+  background-color: var(--accent);
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+
+/* The entry is a scale only, never a fade: the screen must be fully visible where animations do
+   not run (a background tab, a slow phone), like the shot notice. The exit may fade: a timer hides
+   it at the end whether the animation ran or not. */
+@keyframes round-intro-in {
+  from { transform: scale(0.96); }
+  to { transform: scale(1); }
+}
+
+@keyframes round-intro-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
 }
 
 /* Under the table: status, last move, hand, fire button. */
@@ -2827,7 +2883,8 @@ li.tablo-row { min-height: 56px; }
 .motion-off .revolver.is-blank .rv-hammer { animation: rv-hammer 0.06s ease-in forwards; }
 .motion-off .revolver.is-live .rv-flash { animation: rv-fade 0.42s linear 0.06s; transform: none; }
 .motion-off .revolver.is-blank .rv-smoke { animation: rv-fade 0.42s linear 0.06s; transform: none; }
-.motion-off .reload-banner.is-showing { animation: none; }
+.motion-off .round-intro,
+.motion-off .round-intro.is-leaving { animation: none; }
 .motion-off .fire-button.is-urgent {
   animation: none;
   box-shadow: 0 0 0 4px rgba(217, 68, 58, 0.55);

@@ -282,30 +282,7 @@ export function toolUsedLine(e, nameOf) {
   return t('tableTools.toolLine', nameOf(e.by), toolName(e.tool), detail);
 }
 
-// --- Reload announcement -----------------------------------------------------------------------
-
-/**
- * The announcement of a (re)load: "3 Dolu · 3 Boş". Only the two announced counts; never the
- * number of chambers left or what has been fired.
- * @param {{ live: number, blank: number }} counts a `reloaded` event or view.round.announced
- */
-export function reloadText(counts) {
-  if (!counts || !Number.isInteger(counts.live) || !Number.isInteger(counts.blank)) return null;
-  return { live: t('table.reloadLive', counts.live), blank: t('table.reloadBlank', counts.blank), text: t('table.reloadCounts', counts.live, counts.blank) };
-}
-
-/**
- * The announcement to show for an update, if any: the last `reloaded` event of a new update; on
- * the first update (match start or a reloaded page) the announced counts while nothing has been
- * fired yet this round.
- */
-export function reloadFor(update) {
-  if (!update?.view || update.view.status !== 'active') return null;
-  if (update.initial) return update.view.round.shots === 0 ? reloadText(update.view.round.announced) : null;
-  let last = null;
-  for (const e of update.events ?? []) if (e.type === 'reloaded') last = e;
-  return last ? reloadText(last) : null;
-}
+// --- Shots ----------------------------------------------------------------------------------------
 
 /** The public shots of an update, in order (what every screen animates). */
 export function shotsIn(events) {

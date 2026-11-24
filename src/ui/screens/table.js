@@ -99,8 +99,6 @@ import {
   outRounds,
   placeSeats,
   pointsLeft,
-  reloadFor,
-  reloadText,
   revolverSeat,
   seatLayout,
   seatTags,
@@ -112,11 +110,11 @@ import {
   watchStrip,
 } from '../table-model.js';
 import { ROOM_ERR, isSeatPresent, pauseWindow, summarizeView } from '../../rooms/index.js';
+import { introFraction, introModel } from '../intro-model.js';
 
 const LOST_CODES = [ROOM_ERR.SEAT_LOST, ROOM_ERR.NOT_MEMBER, ROOM_ERR.ROOM_NOT_FOUND];
-const RELOAD_SHOW_MS = 2200; // the reload announcement stays this long
 const FRESH_START_MS = 4000; // a match's first update this young is heard (sounds, step 4.4c)
-const TURN_AFTER_RELOAD_MS = 1300; // the turn chime waits for the reload sound (no pause: old states)
+const INTRO_FADE_MS = 200; // the round intro fades out this long (style.css .round-intro.is-leaving)
 const END_HOLD_MS = 1600; // the final table stays this long before the end screen
 const ERROR_SHOW_MS = 6000;
 const RING = 2 * Math.PI * 22; // countdown ring circumference (r = 22)
@@ -262,21 +260,33 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
   stops.push(onSettingsChange((settings, before) => {
     if (settings.revolver !== before.revolver) revolverWrap.replaceChildren(revolverSvg(settings.revolver));
   }));
-  const reloadLive = h('span', { class: 'reload-live' });
-  const reloadBlank = h('span', { class: 'reload-blank' });
-  const reloadSr = h('span', { class: 'visually-hidden' });
-  const reloadBanner = h('div', { class: 'reload-banner', 'aria-hidden': 'true', hidden: true },
-    h('span', { class: 'reload-kicker', text: t('table.reloadLabel') }),
-    h('span', { class: 'reload-counts' }, reloadLive, h('span', { class: 'reload-dot', text: '·' }), reloadBlank));
-  const reloadLive2 = h('p', { class: 'visually-hidden', role: 'status' }, reloadSr);
   // Çift Ateş: "×2" by the revolver until the next shot (public; decision 54, never red).
   const doubleBadge = h('span', { class: 'double-badge', role: 'img', 'aria-label': t('tableTools.doubleLabel'), text: t('tableTools.doubleMark'), hidden: true });
-  // The round intro (decision Q79), a PLACEHOLDER for now (step 4.4d-a): "<n>. tur" and the counts
-  // in the middle of the table while the intro runs; the real intro screen comes in step 4.4d-b.
-  const introTitle = h('span', { class: 'intro-placeholder-title' });
-  const introCounts = h('span', { class: 'intro-placeholder-counts' });
-  const introOverlay = h('div', { class: 'intro-placeholder', role: 'status', hidden: true }, introTitle, introCounts);
-  const stage = h('div', { class: 'table-stage' }, disc, decor, arrows, revolverWrap, doubleBadge, reloadBanner, introOverlay);
+  const stage = h('div', { class: 'table-stage' }, disc, decor, arrows, revolverWrap, doubleBadge);
+
+  // The round intro, "Tur girişi" (step 4.4d-b, decision Q79; approved mock: conversation 23,
+  // model 1): a full screen over the table during the intro, for players and spectators alike.
+  // Texts and numbers from intro-model.js; the bar from the shared pause window. The visual part
+  // is hidden from screen readers: introSr announces it once.
+  const introKicker = h('span', { class: 'round-intro-kicker' });
+  const introRound = h('span', { class: 'round-intro-round' });
+  const introDots = h('div', { class: 'round-intro-dots' });
+  const introTotal = h('span', { class: 'round-intro-total' });
+  const introLive = h('span', { class: 'round-intro-live' });
+  const introBlank = h('span', { class: 'round-intro-blank' });
+  const introFirst = h('span', { class: 'round-intro-first' });
+  const introFill = h('span', { class: 'round-intro-fill' });
+  const introView = h('section', { class: 'round-intro', hidden: true, 'aria-hidden': 'true' },
+    h('div', { class: 'round-intro-top' },
+      h('span', { text: t('common.tableTitle', code) }),
+      h('span', { text: modeLabel(mode) })),
+    h('div', { class: 'round-intro-body' },
+      introKicker, introRound, introDots, introTotal,
+      h('div', { class: 'round-intro-counts' }, introLive, h('span', { class: 'round-intro-sep', text: '·' }), introBlank),
+      introFirst),
+    h('div', { class: 'round-intro-bar' }, introFill));
+  const introSr = h('p', { class: 'visually-hidden', role: 'status' });
+  let introRaf = null;
   const seatEls = new Map(); // seatId -> { el, tag, name, lives, chains, bars }
 
   const statusLine = h('h2', { class: 'table-status-text' });
@@ -343,8 +353,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
 
   const tableView = h('div', { class: 'table-view' },
     topBar, noticeRegion, stage,
-    h('div', { class: 'table-lower' }, status, effects, errors.el, noteLine, lootWrap, ransomWrap, ransomBar, hand, strip, stepBar, fireWrap, closeControl.el),
-    reloadLive2);
+    h('div', { class: 'table-lower' }, status, effects, errors.el, noteLine, lootWrap, ransomWrap, ransomBar, hand, strip, stepBar, fireWrap, closeControl.el));
 
   // End screen (filled when the match is over).
   const endTitle = h('h1', { class: 'end-title' });
@@ -367,7 +376,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
       backButton),
     backNote);
 
-  const el = h('div', { class: 'table-screen' }, tableView, endView);
+  const el = h('div', { class: 'table-screen' }, tableView, endView, introView, introSr);
 
   // The live Tablo (the waiting room's panel; "Bu maç" from this device's view and events).
   const tablo = createTablo({ mySeat, loadLastMatch: async () => null });
@@ -818,39 +827,29 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
     if (win === null || win.seq !== pause?.seq) setPause(win, audible);
     renderAll();
     tablo.refresh();
-    if (pause === null) {
-      // No pause (an ordinary turn, or a match stored before Q79): as before.
-      const reload = reloadFor(update);
-      if (reload) showReload(reload);
-      const loaded = update.view.round?.announced;
-      const reloadSound = Boolean(reload) && audible
-        && playSound('reload', { count: loaded ? loaded.live + loaded.blank : undefined });
-      if (audible && !turnWasMine && myTurn()) {
-        // The turn became mine: the chime, after the reload sound if both come together.
-        if (reloadSound) later(() => { if (myTurn()) playSound('turn'); }, TURN_AFTER_RELOAD_MS);
-        else playSound('turn');
-      }
-    }
+    // No pause (an ordinary turn): the chime when the turn became mine. Refills always pause now:
+    // the intro announces the round and plays the reload sound.
+    if (pause === null && audible && !turnWasMine && myTurn()) playSound('turn');
     evaluatePress();
   }
 
   // --- Round pauses (decision Q79) ---------------------------------------------------------------
   // Round-end pause: the last shot's notice stays, nothing can be played. Intro: the notice is
-  // cut, the reload banner is replaced by the intro (placeholder), the reload sound plays; at its
-  // end the turn chime plays for the turn player and the table opens again. Every countdown is
-  // frozen meanwhile (the shot ring stays full, an open loot's seconds stand still).
+  // cut and the "Tur girişi" screen covers the table (the round's numbers, the first turn, a bar
+  // filling to the shared pause end), the reload sound plays; at its end the turn chime plays for
+  // the turn player and the table opens again. Every countdown is frozen meanwhile (the shot ring
+  // stays full, an open loot's seconds stand still).
   function setPause(win, audible) {
     pause = win;
     later(() => {}, 0, 'pauseIntro');
     later(() => {}, 0, 'pauseEnd');
-    introOverlay.hidden = true;
+    hideIntro(false);
     if (win === null) return;
     const now = Date.now() + offset;
     if (now >= win.end) {
       pause = null;
       return;
     }
-    reloadBanner.hidden = true;
     later(() => enterIntro(audible), Math.max(0, win.introAt - now), 'pauseIntro');
     later(() => leavePause(audible), win.end - now, 'pauseEnd');
   }
@@ -860,23 +859,75 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
     // The shot notice is cut when the intro starts.
     later(() => {}, 0, 'notice');
     noticeRegion.replaceChildren();
-    later(() => {}, 0, 'reload');
-    reloadBanner.hidden = true;
-    const { round: r } = applied.view;
-    const counts = reloadText(r.announced);
-    introTitle.textContent = t('table.introRound', r.index);
-    introCounts.textContent = counts ? `${counts.live} · ${counts.blank}` : '';
-    introOverlay.hidden = false;
-    if (counts) reloadSr.textContent = t('table.reloadAnnounced', counts.text);
-    if (audible) playSound('reload', { count: r.announced ? r.announced.live + r.announced.blank : undefined });
+    showIntro();
+    const counts = applied.view.round?.announced;
+    if (audible) playSound('reload', { count: counts ? counts.live + counts.blank : undefined });
   }
 
   function leavePause(audible) {
-    introOverlay.hidden = true;
     pause = null;
+    hideIntro(true);
     renderAll();
     evaluatePress();
     if (audible && myTurn()) playSound('turn');
+  }
+
+  // --- The round intro screen ("Tur girişi") -----------------------------------------------------
+  function showIntro() {
+    const model = introModel({ view: applied.view, mySeat, nameOf });
+    if (model === null) return;
+    introKicker.textContent = model.kicker;
+    introRound.textContent = model.round;
+    // Two groups, Dolu filled then Boş outlined: never the cylinder's order.
+    introDots.replaceChildren(
+      ...Array.from({ length: model.liveDots }, () => h('span', { class: 'round-intro-bullet is-live' })),
+      h('span', { class: 'round-intro-gap' }),
+      ...Array.from({ length: model.blankDots }, () => h('span', { class: 'round-intro-bullet is-blank' })));
+    introTotal.textContent = model.total;
+    introLive.textContent = model.live;
+    introBlank.textContent = model.blank;
+    introFirst.textContent = model.first ?? '';
+    introFirst.hidden = model.first === null;
+    later(() => {}, 0, 'introHide');
+    introView.classList.remove('is-leaving');
+    introView.hidden = false;
+    // The intro replaces the table: nothing of it shows at the edges (even where the scale-in
+    // does not run) or reaches a screen reader meanwhile.
+    el.classList.add('is-intro');
+    // Announced once, when the intro starts (also on a page that arrives mid-intro).
+    introSr.textContent = model.announce;
+    tickIntroBar();
+  }
+
+  // The bar: how much of the shared intro window has passed (a late device starts part-filled).
+  // Hareketler off (Q53): it moves in whole seconds instead of continuously.
+  function tickIntroBar() {
+    if (introRaf !== null) cancelAnimationFrame(introRaf);
+    introRaf = null;
+    if (destroyed || introView.hidden || pause === null) return;
+    const reduced = reducedMotion();
+    introFill.style.transform = `scaleX(${introFraction(pause, Date.now() + offset, { stepMs: reduced ? 1000 : 0 }).toFixed(4)})`;
+    if (reduced) later(tickIntroBar, 250, 'introBar');
+    else introRaf = requestAnimationFrame(tickIntroBar);
+  }
+
+  function hideIntro(animated) {
+    if (introRaf !== null) cancelAnimationFrame(introRaf);
+    introRaf = null;
+    later(() => {}, 0, 'introBar');
+    introSr.textContent = '';
+    el.classList.remove('is-intro');
+    if (introView.hidden) return;
+    if (!animated || reducedMotion()) {
+      introView.hidden = true;
+      introView.classList.remove('is-leaving');
+      return;
+    }
+    introView.classList.add('is-leaving');
+    later(() => {
+      introView.hidden = true;
+      introView.classList.remove('is-leaving');
+    }, INTRO_FADE_MS, 'introHide');
   }
 
   // A round pause is running now (decision Q79): nothing can be played.
@@ -1538,21 +1589,6 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
     await wait(SHOT_TIMING.hold);
   }
 
-  // --- Reload announcement -----------------------------------------------------------------------
-  function showReload({ live, blank, text }) {
-    reloadLive.textContent = live;
-    reloadBlank.textContent = blank;
-    reloadSr.textContent = t('table.reloadAnnounced', text);
-    reloadBanner.hidden = false;
-    reloadBanner.classList.remove('is-showing');
-    void reloadBanner.offsetWidth;
-    reloadBanner.classList.add('is-showing');
-    later(() => {
-      reloadBanner.hidden = true;
-      reloadBanner.classList.remove('is-showing');
-    }, RELOAD_SHOW_MS, 'reload');
-  }
-
   // --- The fire button's press ---------------------------------------------------------------------
   function dispatch(event) {
     const result = pressStep(press, event);
@@ -1737,6 +1773,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
       document.removeEventListener('click', closeEffects);
       document.removeEventListener('click', closeMenuOutside);
       clearInterval(tick);
+      if (introRaf !== null) cancelAnimationFrame(introRaf);
       for (const id of timers) clearTimeout(id);
       timers.clear();
       for (const stop of stops.splice(0)) {

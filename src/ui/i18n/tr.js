@@ -324,11 +324,7 @@ export default Object.freeze({
     playerRemovedLine: (name) => `${name} masadan çıkarıldı.`,
     turnSkippedLine: (name) => `${name} hapiste, sırası geçti.`,
     matchOver: 'Maç bitti.',
-    reloadLive: (count) => `${count} Dolu`,
-    reloadBlank: (count) => `${count} Boş`,
-    introRound: (n) => `${n}. tur`,
     pauseWait: 'Tur başlıyor…',
-    reloadLabel: 'Mermiler dolduruldu',
     secondsLeft: (seconds) => `${seconds} saniye kaldı`,
     handTitle: (count) => `Elin · ${count} malzeme`,
     handEmpty: 'Elin boş',
@@ -343,8 +339,20 @@ export default Object.freeze({
     watching: 'İzliyorsun',
     watchingWaiting: 'İzliyorsun · sonraki maçı bekliyorsun',
     lastEvent: (lead) => `Son olay: ${lead}`,
-    reloadCounts: (live, blank) => `${live} Dolu · ${blank} Boş`,
-    reloadAnnounced: (counts) => `Mermiler dolduruldu: ${counts}`,
+  },
+
+  // The round intro, "Tur girişi" (step 4.4d-b, decision Q79; approved mock: conversation 23).
+  roundIntro: {
+    matchStarting: 'Maç başlıyor',
+    newRound: 'Yeni tur',
+    round: (n) => `${n}. tur`,
+    bullets: (count) => `${count} mermi`,
+    live: (count) => `${count} Dolu`,
+    blank: (count) => `${count} Boş`,
+    counts: (live, blank) => `${live} Dolu, ${blank} Boş`,
+    firstTurn: (name) => `İlk sıra: ${name}`,
+    firstTurnYou: 'İlk sıra: sen',
+    announce: (kicker, round, total, counts, first) => `${kicker}. ${round}: ${total}, ${counts}. ${first}`,
   },
 
   kickMatch: {

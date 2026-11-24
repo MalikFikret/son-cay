@@ -346,11 +346,7 @@ export default Object.freeze({
     playerRemovedLine: (name) => `${name} was removed from the table.`,
     turnSkippedLine: (name) => `${name} is in jail; their turn was skipped.`,
     matchOver: 'The match is over.',
-    reloadLive: (count) => `${count} Loaded`,
-    reloadBlank: (count) => `${count} Empty`,
-    introRound: (n) => `Round ${n}`,
     pauseWait: 'Round starting…',
-    reloadLabel: 'Bullets loaded',
     secondsLeft: (seconds) => (seconds === 1 ? '1 second left' : `${seconds} seconds left`),
     handTitle: (count) => `Your hand · ${plural(count, 'item', 'items')}`,
     handEmpty: 'Your hand is empty',
@@ -365,8 +361,20 @@ export default Object.freeze({
     watching: 'Spectating',
     watchingWaiting: 'Spectating · waiting for the next match',
     lastEvent: (lead) => `Last move: ${lead}`,
-    reloadCounts: (live, blank) => `${live} Loaded · ${blank} Empty`,
-    reloadAnnounced: (counts) => `Bullets loaded: ${counts}`,
+  },
+
+  // The round intro (step 4.4d-b, decision Q79).
+  roundIntro: {
+    matchStarting: 'Match starting',
+    newRound: 'New round',
+    round: (n) => `Round ${n}`,
+    bullets: (count) => plural(count, 'bullet', 'bullets'),
+    live: (count) => `${count} Loaded`,
+    blank: (count) => `${count} Empty`,
+    counts: (live, blank) => `${live} Loaded, ${blank} Empty`,
+    firstTurn: (name) => `First turn: ${name}`,
+    firstTurnYou: 'First turn: you',
+    announce: (kicker, round, total, counts, first) => `${kicker}. ${round}: ${total}, ${counts}. ${first}`,
   },
 
   kickMatch: {

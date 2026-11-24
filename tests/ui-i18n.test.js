@@ -272,7 +272,8 @@ describe('the Turkish locale', () => {
     assert.equal(t('lobby.waitingForHost', 'Selin'), 'Selin maçı başlatınca masa açılır');
     assert.equal(t('lobby.waitingForHost', ''), 'Masa sahibi maçı başlatınca masa açılır');
     assert.equal(t('lobby.copyFailed', 'https://x/#/masa/ABC234'), 'Kopyalanamadı. Bağlantıyı elle seçip kopyala. https://x/#/masa/ABC234');
-    assert.equal(t('table.reloadCounts', 3, 2), '3 Dolu · 2 Boş');
+    assert.equal(t('roundIntro.counts', 3, 2), '3 Dolu, 2 Boş');
+    assert.equal(t('roundIntro.bullets', 5), '5 mermi');
     assert.equal(t('table.lastEvent', 'Maç başladı.'), 'Son olay: Maç başladı.');
     assert.equal(t('app.pageTitle', t('app.titleLobby')), 'Son Çay: bekleme salonu');
     assert.equal(t('away.homeBarBack', 'ABC234'), 'Masaya dön · Masa ABC234');
@@ -389,7 +390,9 @@ describe('the English locale (decision Q72)', () => {
     assert.equal(t('lobby.waitingForHost', ''), 'The table opens when the host starts the match');
     assert.equal(t('tableTools.toolLine', 'Ada', 'Chain', 'Bora and Cem'), 'Ada used an item: Chain · Bora and Cem.');
     assert.equal(t('table.shotAtOther', 'Ada', 'Bora'), 'Ada fired at Bora.');
-    assert.equal(t('table.reloadCounts', 1, 4), '1 Loaded · 4 Empty');
+    assert.equal(t('roundIntro.counts', 1, 4), '1 Loaded, 4 Empty');
+    assert.equal(t('roundIntro.bullets', 1), '1 bullet');
+    assert.equal(t('roundIntro.bullets', 5), '5 bullets');
   }));
 
   test('models read their texts when called, so a language switch reaches them (no texts frozen at import)', () => {
