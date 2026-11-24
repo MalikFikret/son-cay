@@ -4,11 +4,12 @@
 // Handlers run on a draft state: they may mutate first and reject later,
 // because a rejection discards the whole draft.
 
-import { ERR, TOOL_INFO, isHiddenTool, isToolId } from './constants.js';
+import { ERR, TOOL_INFO, isHiddenTool, isToolId, REFILL_PAUSE_MS } from './constants.js';
 import { alivePlayers, reject, removeOne, requireAlivePlayer, requireTarget } from './util.js';
 import { pub, priv } from './events.js';
 import { shuffleInPlace } from './rng.js';
 import { currentChamber, reloadIfEmpty } from './roulette.js';
+import { setClock } from './turn.js';
 import { activeShieldIndex } from './shot.js';
 
 function requireCurrent(state, player) {
@@ -74,7 +75,10 @@ const TOOL_HANDLERS = {
       pub(ctx, 'toolUsed', { tool: 'skip', by: player.id });
       priv(ctx, player.id, 'toolResult', { tool: 'skip', by: player.id, chamber: chamber.type });
     }
-    reloadIfEmpty(ctx);
+    // The last Mermi was discarded: the round ends and refills mid-turn. The turn stays, with a
+    // fresh countdown after the round pause (decision Q79): the engine cannot freeze the running
+    // one, it does not know how much of it has passed.
+    if (reloadIfEmpty(ctx)) setClock(s, 'shot', s.turn.playerId, REFILL_PAUSE_MS);
   },
 
   // Swaps the current chamber with the next one, revealing neither.

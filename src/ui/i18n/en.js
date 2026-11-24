@@ -348,6 +348,8 @@ export default Object.freeze({
     matchOver: 'The match is over.',
     reloadLive: (count) => `${count} Loaded`,
     reloadBlank: (count) => `${count} Empty`,
+    introRound: (n) => `Round ${n}`,
+    pauseWait: 'Round starting…',
     reloadLabel: 'Bullets loaded',
     secondsLeft: (seconds) => (seconds === 1 ? '1 second left' : `${seconds} seconds left`),
     handTitle: (count) => `Your hand · ${plural(count, 'item', 'items')}`,

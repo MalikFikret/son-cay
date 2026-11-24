@@ -79,6 +79,18 @@ export const PHASES = ['turn', 'confirm', 'handSwap', 'steal', 'ended'];
 // The engine has no clock: the looter's device sends the expiry.
 export const LOOT_SECONDS = 15;
 
+// The round pauses (decision Q79; fixed, not table settings). The engine has no clock: it only
+// records, on the countdown that starts in the same write, how long the devices must wait before
+// that countdown runs (state.clock.pauseMs; deadline = clockAt + pauseMs + the countdown).
+// - ROUND_INTRO_MS before every round's first turn, the match's first round included;
+// - ROUND_END_PAUSE_MS before that, when a write ends a round and refills (the last shot's
+//   result stays on screen), so a refill pauses ROUND_END_PAUSE_MS + ROUND_INTRO_MS in all.
+// During a pause nothing may be played and every countdown (the shot clock, open loots) is
+// frozen: the room layer and the UI enforce it (src/rooms/clock.js pauseWindow).
+export const ROUND_END_PAUSE_MS = 5000;
+export const ROUND_INTRO_MS = 4000;
+export const REFILL_PAUSE_MS = ROUND_END_PAUSE_MS + ROUND_INTRO_MS;
+
 export const ACTION_TYPES = [
   'chooseTarget',
   'confirmShot',

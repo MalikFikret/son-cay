@@ -180,7 +180,7 @@ test('loot deadline: the memory keeps only the latest countdowns', () => {
   for (let seq = 1; seq <= CLOCK_MEMORY_SIZE + 10; seq += 1) memory = rememberClockAt(memory, seq, seq * 1000);
   assert.equal(Object.keys(memory).length, CLOCK_MEMORY_SIZE);
   assert.equal(memory[1], undefined);
-  assert.equal(memory[CLOCK_MEMORY_SIZE + 10], (CLOCK_MEMORY_SIZE + 10) * 1000);
+  assert.deepEqual(memory[CLOCK_MEMORY_SIZE + 10], { at: (CLOCK_MEMORY_SIZE + 10) * 1000, pauseMs: 0 });
   assert.equal(rememberClockAt(memory, 'x', 5), memory);
 });
 

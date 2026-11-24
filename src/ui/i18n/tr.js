@@ -326,6 +326,8 @@ export default Object.freeze({
     matchOver: 'Maç bitti.',
     reloadLive: (count) => `${count} Dolu`,
     reloadBlank: (count) => `${count} Boş`,
+    introRound: (n) => `${n}. tur`,
+    pauseWait: 'Tur başlıyor…',
     reloadLabel: 'Mermiler dolduruldu',
     secondsLeft: (seconds) => `${seconds} saniye kaldı`,
     handTitle: (count) => `Elin · ${count} malzeme`,

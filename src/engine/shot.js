@@ -4,6 +4,7 @@
 
 import { alivePlayers, getPlayer } from './util.js';
 import { pub, priv, audit } from './events.js';
+import { REFILL_PAUSE_MS } from './constants.js';
 import { chamberEffect, currentChamber, reloadIfEmpty } from './roulette.js';
 import { resolvePredictions } from './ghosts.js';
 import { closeOffer, closeOffersTo } from './jail.js';
@@ -97,7 +98,7 @@ export function endMatch(ctx) {
   s.result = alive.length === 1 ? { type: 'win', winner: alive[0].id } : { type: 'draw', winner: null };
   s.phase = { type: 'ended' };
   s.predictions = {};
-  s.clock = { seq: s.clock.seq + 1, kind: 'none', playerId: null };
+  s.clock = { seq: s.clock.seq + 1, kind: 'none', playerId: null, pauseMs: 0 };
   pub(ctx, 'matchEnded', {
     result: s.result.type,
     winner: s.result.winner,
@@ -159,7 +160,8 @@ export function fire(ctx, shooterId, targetId, auto) {
   }
 
   s.phase = { type: 'turn' };
-  reloadIfEmpty(ctx);
+  // A refill pauses the next countdown (decision Q79): the round-end pause, then the intro.
+  const pauseMs = reloadIfEmpty(ctx) ? REFILL_PAUSE_MS : 0;
 
   // The credited player loots each victim, if still alive and not the victim
   // (decision 63: a private standing offer; the turn passes at once).
@@ -175,8 +177,8 @@ export function fire(ctx, shooterId, targetId, auto) {
     }
   }
 
-  if (selfBlank) continueTurn(ctx);
-  else advanceTurn(ctx);
+  if (selfBlank) continueTurn(ctx, pauseMs);
+  else advanceTurn(ctx, pauseMs);
   // After the turn moved on: the offers start with the countdown of this write.
   for (const loot of loots) openLoot(ctx, loot.looter, loot.victim);
 }

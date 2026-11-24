@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { get, onDisconnect, onValue, ref, runTransaction, serverTimestamp, update } from 'firebase/database';
 import { defaultConfig } from '../src/engine/index.js';
-import { SEAT_IDS, createRoomApi, toDbValue } from '../src/rooms/index.js';
+import { MATCH_PAUSED, SEAT_IDS, createRoomApi, toDbValue } from '../src/rooms/index.js';
 
 // Server timestamp placeholder, as the SDK sends it.
 export const NOW = { '.sv': 'timestamp' };
@@ -58,9 +58,34 @@ export function roomFixtures(rt) {
 
   // All deps, as the browser game will pass them. Returns the api and its database (for
   // goOffline in tests).
-  function liveRoomsApi(uid, extra = {}) {
+  // Round pauses (decision Q79): a move refused with MATCH_PAUSED is retried once after the pause
+  // is fast-forwarded (match/clockAt moved back by the time left, rules disabled), as if the
+  // time had passed: the tests of everything else need not wait 4-7 s per round. The pause
+  // itself is tested with { keepPauses: true }, which leaves the api as the game uses it.
+  function liveRoomsApi(uid, { keepPauses = false, ...extra } = {}) {
     const db = rt.modularDb(uid);
-    return { db, api: createRoomApi({ db, ref, get, update, serverTimestamp, onValue, onDisconnect, runTransaction, ...extra }) };
+    const api = createRoomApi({ db, ref, get, update, serverTimestamp, onValue, onDisconnect, runTransaction, ...extra });
+    if (!keepPauses) {
+      for (const name of ['submitAction', 'removeAbsentPlayer']) {
+        const original = api[name];
+        api[name] = async (input) => {
+          const result = await original(input);
+          if (result?.ok !== false || result.error?.code !== MATCH_PAUSED) return result;
+          await fastForwardPause(input?.code ?? CODE, result.error.leftMs);
+          return original(input);
+        };
+      }
+    }
+    return { db, api };
+  }
+
+  // Moves the running match's countdown start back by `leftMs` (+ a margin): its round pause is over.
+  async function fastForwardPause(code, leftMs) {
+    await rt.withRulesDisabled(async (db) => {
+      const at = db.ref(`rooms/${code}/match/clockAt`);
+      const value = (await at.get()).val();
+      if (typeof value === 'number') await at.set(value - (Number(leftMs) || 0) - 1000);
+    });
   }
 
   // Everything stored under rooms/{code}, read with rules disabled.
@@ -142,5 +167,5 @@ export function roomFixtures(rt) {
     await rt.withRulesDisabled((db) => db.ref(`rooms/${code}/seats/${seatId}/joinedAt`).set(joinedAt));
   }
 
-  return { roomsApi, liveRoomsApi, seedPresence, setJoinedAt, dumpRoom, creationUpdate, joinUpdate, claimUpdate, transferUpdate, write, seedRoom };
+  return { roomsApi, liveRoomsApi, fastForwardPause, seedPresence, setJoinedAt, dumpRoom, creationUpdate, joinUpdate, claimUpdate, transferUpdate, write, seedRoom };
 }

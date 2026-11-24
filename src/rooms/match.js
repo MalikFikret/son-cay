@@ -21,7 +21,7 @@
 // Like the rest of src/rooms, this module never imports Firebase: the functions come in deps.
 
 import { MAX_PLAYERS, MIN_PLAYERS, applyAction, createMatch, eventsFor, validateConfig, viewFor } from '../engine/index.js';
-import { createClockRunner, createLootRunner, lootDeadline, rememberClockAt } from './clock.js';
+import { createClockRunner, createLootRunner, lootDeadline, pauseWindow, rememberClockAt } from './clock.js';
 import { ROOM_ERR, RoomError, isPermissionDenied } from './errors.js';
 import { isSeatPresent } from './host.js';
 import {
@@ -40,6 +40,13 @@ const LAYER_ONLY = ['removePlayer'];
 // A timeout for a countdown that already moved on: normal (another device was faster).
 const STALE_TIMEOUT = 'STALE_TIMEOUT';
 const NO_LOOT = 'NO_LOOT'; // the loot was already chosen or closed: a normal answer to an expiry
+/**
+ * The answer to any move during a round pause (decision Q79): { ok: false, error: { code:
+ * 'MATCH_PAUSED', leftMs } }, nothing written. Like an engine refusal, not a RoomError.
+ */
+export const MATCH_PAUSED = 'MATCH_PAUSED';
+/** A move this close to the end of a pause is let through (clock offsets are estimates). */
+export const PAUSE_GRACE_MS = 250;
 // Another device that sees an ended match without results writes them after 1-3 s.
 const FINISH_DELAY_MS = 1000;
 const FINISH_JITTER_MS = 2000;
@@ -69,6 +76,23 @@ export function createMatchFunctions(ctx) {
   const { deps, db, ref, read, writeAll, serverTimestamp, requireUid, requireCode, requireSeat, currentSeat, traffic } = ctx;
   const randomSeed = typeof deps.randomSeed === 'function' ? deps.randomSeed : defaultRandomSeed;
   const now = typeof deps.now === 'function' ? deps.now : () => Date.now();
+
+  // The server time offset (.info/serverTimeOffset), shared by every function of this instance:
+  // the round pauses are judged in server time (decision Q79). Watched from the first match call.
+  let serverOffset = 0;
+  let offsetWatched = false;
+  function watchServerOffset() {
+    if (offsetWatched || typeof deps.onValue !== 'function') return;
+    offsetWatched = true;
+    try {
+      deps.onValue(ref(db, '.info/serverTimeOffset'), (snapshot) => {
+        serverOffset = Number(snapshot?.val?.()) || 0;
+      }, () => {});
+    } catch {
+      offsetWatched = false; // a test double without .info: local time stands in
+    }
+  }
+  const serverNow = () => now() + serverOffset;
   const random = typeof deps.random === 'function' ? deps.random : Math.random;
   const setTimer = typeof deps.setTimeout === 'function' ? deps.setTimeout : (fn, ms) => globalThis.setTimeout(fn, ms);
   const clearTimer = typeof deps.clearTimeout === 'function' ? deps.clearTimeout : (id) => globalThis.clearTimeout(id);
@@ -186,6 +210,13 @@ export function createMatchFunctions(ctx) {
         outcome = { ok: false, error: { code: 'INVALID_STATE', message: 'the stored match state is unreadable' } };
         return undefined;
       }
+      // A round pause (decision Q79): nothing may be played, timeouts and loot expiries included;
+      // judged on the latest stored state and server time, so every device agrees.
+      const pause = pauseWindow(state.clock, current.clockAt);
+      if (pause !== null && serverNow() < pause.end - PAUSE_GRACE_MS) {
+        outcome = { ok: false, error: { code: MATCH_PAUSED, message: 'the round is paused', leftMs: pause.end - serverNow() } };
+        return undefined;
+      }
       const result = applyAction(state, move);
       if (!result.ok) {
         outcome = { ok: false, error: result.error };
@@ -270,7 +301,8 @@ export function createMatchFunctions(ctx) {
    * @returns {Promise<{ ok: true, events: object[], ended?: boolean, finished?: boolean }
    *   | { ok: false, error: { code: string, message?: string } }>}
    *   `events`: the events of this action that the caller's seat may see; `error.code`: the
-   *   engine's code (e.g. NOT_YOUR_TURN, STALE_TIMEOUT) when the engine refuses the action
+   *   engine's code (e.g. NOT_YOUR_TURN, STALE_TIMEOUT) when the engine refuses the action, or
+   *   MATCH_PAUSED (with `leftMs`) during a round pause (decision Q79)
    * @throws {RoomError} INVALID_UID, INVALID_CODE, INVALID_ACTION, ACTION_NOT_ALLOWED
    *   (removePlayer: use removeAbsentPlayer), ROOM_NOT_FOUND, NO_MATCH, NOT_MEMBER,
    *   WRITE_DENIED, INVALID_DEPENDENCIES
@@ -285,6 +317,7 @@ export function createMatchFunctions(ctx) {
       throw new RoomError(ROOM_ERR.ACTION_NOT_ALLOWED, `${action.type} cannot be submitted by a player`);
     }
     requireDeps('runTransaction');
+    watchServerOffset();
     const meta = await readMeta(roomCode);
     if (meta.status !== PLAYING_STATUS) throw new RoomError(ROOM_ERR.NO_MATCH, 'no match is running in this room');
     const mySeat = await requireOwnSeat(roomCode, uid);
@@ -309,6 +342,7 @@ export function createMatchFunctions(ctx) {
     const roomCode = requireCode(code);
     requireSeat(seatId);
     requireDeps('runTransaction');
+    watchServerOffset();
     const meta = await readMeta(roomCode);
     if (meta.status !== PLAYING_STATUS) throw new RoomError(ROOM_ERR.NO_MATCH, 'no match is running in this room');
     const mySeat = await requireOwnSeat(roomCode, uid);
@@ -378,11 +412,13 @@ export function createMatchFunctions(ctx) {
       clearTimeout: clearTimer,
       now,
       onExpire(victim) {
-        transact(roomCode, seatId, { type: 'lootChoice', playerId: seatId, victim, choice: { kind: 'none' }, expired: true })
+        const send = () => transact(roomCode, seatId, { type: 'lootChoice', playerId: seatId, victim, choice: { kind: 'none' }, expired: true })
           .then((result) => {
-            if (!result.ok && result.error.code !== NO_LOOT) report(new RoomError(ROOM_ERR.WRITE_DENIED, `loot expiry refused: ${result.error.code}`));
+            if (!result.ok && result.error.code === MATCH_PAUSED) retryAfterPause(result, send);
+            else if (!result.ok && result.error.code !== NO_LOOT) report(new RoomError(ROOM_ERR.WRITE_DENIED, `loot expiry refused: ${result.error.code}`));
           })
           .catch(report);
+        send();
       },
     });
 
@@ -392,13 +428,24 @@ export function createMatchFunctions(ctx) {
       now,
       random,
       onFire(seq) {
-        transact(roomCode, seatId, { type: 'timeout', seq })
+        const send = () => transact(roomCode, seatId, { type: 'timeout', seq })
           .then((result) => {
-            if (!result.ok && result.error.code !== STALE_TIMEOUT) report(new RoomError(ROOM_ERR.WRITE_DENIED, `timeout refused: ${result.error.code}`));
+            if (!result.ok && result.error.code === MATCH_PAUSED) retryAfterPause(result, send);
+            else if (!result.ok && result.error.code !== STALE_TIMEOUT) report(new RoomError(ROOM_ERR.WRITE_DENIED, `timeout refused: ${result.error.code}`));
           })
           .catch(report);
+        send();
       },
     });
+
+    // A timeout or a loot expiry sent a moment before a pause ended (this device's clock runs a
+    // little early, or a pause began meanwhile): sent again once the pause is over.
+    function retryAfterPause(result, send) {
+      const leftMs = Number(result.error.leftMs);
+      setTimer(() => {
+        if (!stopped) send();
+      }, (Number.isFinite(leftMs) && leftMs > 0 ? leftMs : 0) + PAUSE_GRACE_MS);
+    }
 
     function scheduleFinish(value) {
       if (finishFor === value.n) return;
@@ -424,6 +471,7 @@ export function createMatchFunctions(ctx) {
       unsubscribers.push(
         deps.onValue(ref(db, '.info/serverTimeOffset'), (snapshot) => {
           offset = Number(snapshot.val()) || 0;
+          serverOffset = offset;
         }, report),
         deps.onValue(
           ref(db, paths.match(roomCode)),
@@ -448,7 +496,7 @@ export function createMatchFunctions(ctx) {
               memory = {};
               memoryN = value.n;
             }
-            memory = rememberClockAt(memory, state.clock.seq, value.clockAt);
+            memory = rememberClockAt(memory, state.clock.seq, value.clockAt, state.clock.pauseMs);
             // Only my own seat's loots: a device never looks at anybody else's.
             const me = mySeat === null ? null : state.players.find((p) => p.id === mySeat);
             lootRunner.update({ ended, loots: me && me.alive && Array.isArray(me.loots) ? me.loots : [], memory }, offset);
@@ -472,8 +520,9 @@ export function createMatchFunctions(ctx) {
    * (the spectator view for a member who is not a player of this match, e.g. a waiting seat),
    * `events` the new log entries since the previous delivery as eventsFor lets that seat see them,
    * `legalActions` the engine's legal actions of the caller's seat only ([] for a spectator),
-   * `clockAt` the server time the current countdown started (deadline: clockAt +
-   * view.config.shotTimeSeconds * 1000), `lootDeadlines` { [victim]: server time } for the
+   * `clockAt` the server time the write that started the current countdown was committed
+   * (deadline: clockAt + view.clock.pauseMs + view.config.shotTimeSeconds * 1000; the round pause
+   * is pauseWindow(view.clock, clockAt), decision Q79), `lootDeadlines` { [victim]: server time } for the
    * caller's own open loots (view.self.loots; decision 63, see lootDeadline), {} otherwise. The first delivery of a match (the first one,
    * or after a new match started) has initial: true and all of its log entries. Nothing is
    * delivered while the room has no match.
@@ -486,6 +535,7 @@ export function createMatchFunctions(ctx) {
     const roomCode = requireCode(code);
     requireDeps('onValue');
     if (typeof onUpdate !== 'function') throw new RoomError(ROOM_ERR.INVALID_DEPENDENCIES, 'watchMatch needs onUpdate');
+    watchServerOffset();
     const report = reporter(onError);
 
     let stopped = false;
@@ -513,7 +563,7 @@ export function createMatchFunctions(ctx) {
           const playerId = playerIdIn(state, seatId);
           const initial = value.n !== lastN;
           if (initial) memory = {};
-          memory = rememberClockAt(memory, state.clock.seq, value.clockAt);
+          memory = rememberClockAt(memory, state.clock.seq, value.clockAt, state.clock.pauseMs);
           const view = viewFor(state, playerId);
           const lootDeadlines = {};
           for (const loot of view.self?.loots ?? []) {

@@ -4,13 +4,13 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
-import { viewFor } from '../src/engine/index.js';
+import { viewFor, ROUND_INTRO_MS } from '../src/engine/index.js';
 import { ROOM_ERR } from '../src/rooms/index.js';
 import { useRulesTestEnv } from './helpers.js';
 import { CODE, PIN, rejectsWithCode, roomFixtures, waitFor } from './fixtures.js';
 
 const rt = useRulesTestEnv();
-const { roomsApi, liveRoomsApi, dumpRoom, joinUpdate, write, seedRoom } = roomFixtures(rt);
+const { roomsApi, liveRoomsApi, fastForwardPause, dumpRoom, joinUpdate, write, seedRoom } = roomFixtures(rt);
 
 const SEED = 12345;
 const live = (uid) => liveRoomsApi(uid, { randomSeed: () => SEED }).api;
@@ -20,6 +20,8 @@ const stateOf = async () => JSON.parse((await dumpRoom()).match.stateJson);
 async function startedRoom() {
   await seedRoom(['bob', 'carol']);
   await live('host').startMatch({ uid: 'host', code: CODE });
+  // The first round's intro (decision Q79) is over at once: these tests are about waiting seats.
+  await fastForwardPause(CODE, ROUND_INTRO_MS);
 }
 
 // Let every countdown run out until the match ends (the ending device writes the results).

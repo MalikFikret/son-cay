@@ -43,7 +43,7 @@ export function createHomeBar(ctx, view, held) {
     title.textContent = myTurn ? t('table.yourTurn') : t('liveTablo.backToTable');
     // Red bar: "Sıra sende · 17   Masaya dön · Masa CODE ›"; neutral: "Masaya dön   Masa CODE ›".
     const left = myTurn && match ? secondsShown(msLeft({
-      clockAt: match.clockAt, seconds: match.view.config.shotTimeSeconds, kind: match.view.clock.kind, serverNow: Date.now() + offset,
+      clockAt: match.clockAt, pauseMs: match.view.clock.pauseMs, seconds: match.view.config.shotTimeSeconds, kind: match.view.clock.kind, serverNow: Date.now() + offset,
     })) : null;
     seconds.textContent = left === null ? '' : `· ${left}`;
     seconds.hidden = left === null;

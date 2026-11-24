@@ -4,13 +4,13 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
-import { applyAction, eventsFor, listLegalActions, viewFor } from '../src/engine/index.js';
+import { applyAction, eventsFor, listLegalActions, viewFor, ROUND_INTRO_MS } from '../src/engine/index.js';
 import { ROOM_ERR } from '../src/rooms/index.js';
 import { useRulesTestEnv } from './helpers.js';
 import { CODE, NOW, PIN, rejectsWithCode, roomFixtures, seedPin, wait, waitFor } from './fixtures.js';
 
 const rt = useRulesTestEnv();
-const { roomsApi, liveRoomsApi, dumpRoom, joinUpdate, write, seedRoom } = roomFixtures(rt);
+const { roomsApi, liveRoomsApi, fastForwardPause, dumpRoom, joinUpdate, write, seedRoom } = roomFixtures(rt);
 
 const SEED = 12345;
 const live = (uid, extra = {}) => liveRoomsApi(uid, { randomSeed: () => SEED, ...extra }).api;
@@ -25,6 +25,8 @@ const UID = { s01: 'host', s02: 'bob', s03: 'carol', s04: 'dave' };
 async function startedRoom(joiners = ['bob', 'carol']) {
   await seedRoom(joiners);
   const result = await live('host').startMatch({ uid: 'host', code: CODE });
+  // The first round's intro (decision Q79) is over at once: these tests are about the moves.
+  await fastForwardPause(CODE, ROUND_INTRO_MS);
   return result;
 }
 

@@ -52,7 +52,7 @@ test('loot: the shooter takes one tool from the player they eliminated; the rest
   const shot = act(s0, shoot('p1', 'p2'));
   assert.equal(shot.state.phase.type, 'turn');
   assert.equal(shot.state.turn.playerId, 'p3', 'the turn passes at once (dead p2 is skipped)');
-  assert.deepEqual(shot.state.clock, { seq: s0.clock.seq + 1, kind: 'shot', playerId: 'p3' });
+  assert.deepEqual(shot.state.clock, { seq: s0.clock.seq + 1, kind: 'shot', playerId: 'p3', pauseMs: 0 });
   assert.deepEqual(loots(shot.state, 'p1'), [{ victim: 'p2', clockSeq: shot.state.clock.seq }]);
   assert.deepEqual(lootView(shot.state, 'p1'), [{ victim: 'p2', tools: ['heal', 'jail', 'link'], coinsOption: false, clockSeq: shot.state.clock.seq }]);
   const offer = one(privs(shot.events, 'lootOffer'));

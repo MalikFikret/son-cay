@@ -100,6 +100,7 @@ import {
   placeSeats,
   pointsLeft,
   reloadFor,
+  reloadText,
   revolverSeat,
   seatLayout,
   seatTags,
@@ -110,12 +111,12 @@ import {
   targetsFrom,
   watchStrip,
 } from '../table-model.js';
-import { ROOM_ERR, isSeatPresent, summarizeView } from '../../rooms/index.js';
+import { ROOM_ERR, isSeatPresent, pauseWindow, summarizeView } from '../../rooms/index.js';
 
 const LOST_CODES = [ROOM_ERR.SEAT_LOST, ROOM_ERR.NOT_MEMBER, ROOM_ERR.ROOM_NOT_FOUND];
 const RELOAD_SHOW_MS = 2200; // the reload announcement stays this long
 const FRESH_START_MS = 4000; // a match's first update this young is heard (sounds, step 4.4c)
-const TURN_AFTER_RELOAD_MS = 1300; // the turn chime waits for the reload sound
+const TURN_AFTER_RELOAD_MS = 1300; // the turn chime waits for the reload sound (no pause: old states)
 const END_HOLD_MS = 1600; // the final table stays this long before the end screen
 const ERROR_SHOW_MS = 6000;
 const RING = 2 * Math.PI * 22; // countdown ring circumference (r = 22)
@@ -152,6 +153,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
   let events = []; // events seen this match (mine: public + my private ones), from the start
   let outs = {}; // seatId -> { round, removed }
   let round = 0; // the round of the last reloaded event
+  let pause = null; // the running round pause (pauseWindow) of the applied countdown, decision Q79
   let endedAt = null; // when the ended state was drawn (local ms)
   const queue = [];
   let running = false;
@@ -269,7 +271,12 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
   const reloadLive2 = h('p', { class: 'visually-hidden', role: 'status' }, reloadSr);
   // Çift Ateş: "×2" by the revolver until the next shot (public; decision 54, never red).
   const doubleBadge = h('span', { class: 'double-badge', role: 'img', 'aria-label': t('tableTools.doubleLabel'), text: t('tableTools.doubleMark'), hidden: true });
-  const stage = h('div', { class: 'table-stage' }, disc, decor, arrows, revolverWrap, doubleBadge, reloadBanner);
+  // The round intro (decision Q79), a PLACEHOLDER for now (step 4.4d-a): "<n>. tur" and the counts
+  // in the middle of the table while the intro runs; the real intro screen comes in step 4.4d-b.
+  const introTitle = h('span', { class: 'intro-placeholder-title' });
+  const introCounts = h('span', { class: 'intro-placeholder-counts' });
+  const introOverlay = h('div', { class: 'intro-placeholder', role: 'status', hidden: true }, introTitle, introCounts);
+  const stage = h('div', { class: 'table-stage' }, disc, decor, arrows, revolverWrap, doubleBadge, reloadBanner, introOverlay);
   const seatEls = new Map(); // seatId -> { el, tag, name, lives, chains, bars }
 
   const statusLine = h('h2', { class: 'table-status-text' });
@@ -409,6 +416,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
     }
   });
   function askKick(seatId) {
+    if (paused()) return;
     kickSeat = seatId;
     kickSheet.setTitle(t('kickMatch.kickMatchConfirm', nameOf(seatId)));
     kickError.clear();
@@ -451,12 +459,12 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
     cardUsed.hidden = !state.used;
     cardWarn.textContent = state.warning ?? '';
     cardWarn.hidden = !state.warning;
-    cardYes.textContent = sending && state.enabled ? t('tableTools.toolSending') : state.label;
-    cardYes.disabled = !state.enabled || sending;
+    cardYes.textContent = sending && state.enabled ? t('tableTools.toolSending') : (paused() && state.enabled ? t('table.pauseWait') : state.label);
+    cardYes.disabled = !state.enabled || sending || paused();
   }
 
   function onCardUse() {
-    if (cardTool === null || !applied || sending) return;
+    if (cardTool === null || !applied || sending || paused()) return;
     const tool = cardTool;
     if (!cardButton({ view: applied.view, legalActions: applied.legalActions, tool }).enabled) return;
     const spec = toolTargets(applied.legalActions, tool);
@@ -478,7 +486,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
   }
 
   function onStepGo() {
-    if (!applied || sending) return;
+    if (!applied || sending || paused()) return;
     if (stealPick(applied.view)) {
       openSteal();
       return;
@@ -496,7 +504,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
 
   // Sends one tool action of my own seat (the room layer replaces any playerId with mine).
   async function sendTool(action) {
-    if (!action || sending) return;
+    if (!action || sending || paused()) return;
     sending = true;
     renderAll();
     try {
@@ -555,7 +563,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
 
   async function sendSteal(exchange) {
     const pick = applied ? stealPick(applied.view) : null;
-    if (!pick || sending) return;
+    if (!pick || sending || paused()) return;
     const action = stealAction({ take: exchange ? stealTake?.tool ?? null : null, give: exchange ? stealGive?.tool ?? null : null, pick });
     stealSheet.close();
     stealTake = null;
@@ -572,7 +580,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
     h('div', { class: 'dialog-actions' }, ransomNo, ransomYes));
 
   function openRansom() {
-    if (!applied || !ransomRow(applied.view)?.canOffer) return;
+    if (!applied || paused() || !ransomRow(applied.view)?.canOffer) return;
     const pending = ransomRow(applied.view).pending;
     ransomTo = pending ? pending.to : null;
     ransomTool = null;
@@ -615,7 +623,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
 
   // Sends one ransom action of my own seat; nothing else about an offer is written anywhere.
   async function sendRansom(action) {
-    if (!action || ransomSending) return;
+    if (!action || ransomSending || paused()) return;
     ransomSending = true;
     renderRansom();
     try {
@@ -800,23 +808,84 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
       // The final table a moment (at once on a reloaded page), then the end screen.
       later(showEnd, update.initial ? 0 : END_HOLD_MS, 'end');
     }
-    renderAll();
-    tablo.refresh();
-    const reload = reloadFor(update);
-    if (reload) showReload(reload);
     // Sounds (step 4.4c): only for a live update played in time, or the very start of the match
     // (its first update is an "initial" one); never replayed on a reloaded page.
     const audible = animate || freshStart(update);
-    const loaded = update.view.round?.announced;
-    const reloadSound = Boolean(reload) && audible
-      && playSound('reload', { count: loaded ? loaded.live + loaded.blank : undefined });
-    if (audible && !turnWasMine && myTurn()) {
-      // The turn became mine: the chime, after the reload sound if both come together.
-      if (reloadSound) later(() => { if (myTurn()) playSound('turn'); }, TURN_AFTER_RELOAD_MS);
-      else playSound('turn');
+    // The round pause of this countdown (decision Q79), from shared data only (clockAt and the
+    // engine's clock.pauseMs): the same window on every device, and on a reloaded page only what
+    // is left of it.
+    const win = update.view.status === 'active' ? pauseWindow(update.view.clock, update.clockAt) : null;
+    if (win === null || win.seq !== pause?.seq) setPause(win, audible);
+    renderAll();
+    tablo.refresh();
+    if (pause === null) {
+      // No pause (an ordinary turn, or a match stored before Q79): as before.
+      const reload = reloadFor(update);
+      if (reload) showReload(reload);
+      const loaded = update.view.round?.announced;
+      const reloadSound = Boolean(reload) && audible
+        && playSound('reload', { count: loaded ? loaded.live + loaded.blank : undefined });
+      if (audible && !turnWasMine && myTurn()) {
+        // The turn became mine: the chime, after the reload sound if both come together.
+        if (reloadSound) later(() => { if (myTurn()) playSound('turn'); }, TURN_AFTER_RELOAD_MS);
+        else playSound('turn');
+      }
     }
     evaluatePress();
   }
+
+  // --- Round pauses (decision Q79) ---------------------------------------------------------------
+  // Round-end pause: the last shot's notice stays, nothing can be played. Intro: the notice is
+  // cut, the reload banner is replaced by the intro (placeholder), the reload sound plays; at its
+  // end the turn chime plays for the turn player and the table opens again. Every countdown is
+  // frozen meanwhile (the shot ring stays full, an open loot's seconds stand still).
+  function setPause(win, audible) {
+    pause = win;
+    later(() => {}, 0, 'pauseIntro');
+    later(() => {}, 0, 'pauseEnd');
+    introOverlay.hidden = true;
+    if (win === null) return;
+    const now = Date.now() + offset;
+    if (now >= win.end) {
+      pause = null;
+      return;
+    }
+    reloadBanner.hidden = true;
+    later(() => enterIntro(audible), Math.max(0, win.introAt - now), 'pauseIntro');
+    later(() => leavePause(audible), win.end - now, 'pauseEnd');
+  }
+
+  function enterIntro(audible) {
+    if (!applied) return;
+    // The shot notice is cut when the intro starts.
+    later(() => {}, 0, 'notice');
+    noticeRegion.replaceChildren();
+    later(() => {}, 0, 'reload');
+    reloadBanner.hidden = true;
+    const { round: r } = applied.view;
+    const counts = reloadText(r.announced);
+    introTitle.textContent = t('table.introRound', r.index);
+    introCounts.textContent = counts ? `${counts.live} · ${counts.blank}` : '';
+    introOverlay.hidden = false;
+    if (counts) reloadSr.textContent = t('table.reloadAnnounced', counts.text);
+    if (audible) playSound('reload', { count: r.announced ? r.announced.live + r.announced.blank : undefined });
+  }
+
+  function leavePause(audible) {
+    introOverlay.hidden = true;
+    pause = null;
+    renderAll();
+    evaluatePress();
+    if (audible && myTurn()) playSound('turn');
+  }
+
+  // A round pause is running now (decision Q79): nothing can be played.
+  const paused = () => pause !== null && Date.now() + offset < pause.end;
+  // The time the countdowns read: held at the pause's end while it runs, so they stand still.
+  const clockNow = () => {
+    const now = Date.now() + offset;
+    return pause !== null && now < pause.end ? pause.end : now;
+  };
 
   // The first update of a match that has just started (nothing played yet, its countdown a moment
   // old): heard like a live update, unlike a reloaded page.
@@ -831,9 +900,9 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
     && applied.view.turn.playerId === mySeat && applied.view.phase.type === 'turn';
   const myTargets = () => (myTurn() ? targetsFrom(applied.legalActions) : []);
   const clockMs = () => (applied ? msLeft({
-    clockAt: applied.clockAt, seconds: applied.view.config.shotTimeSeconds, kind: applied.view.clock.kind, serverNow: Date.now() + offset,
+    clockAt: applied.clockAt, pauseMs: applied.view.clock.pauseMs, seconds: applied.view.config.shotTimeSeconds, kind: applied.view.clock.kind, serverNow: Date.now() + offset,
   }) : null);
-  const canFire = () => myTurn() && target !== null && !picking && !sending && (clockMs() ?? 1) > 0;
+  const canFire = () => myTurn() && target !== null && !picking && !sending && !paused() && (clockMs() ?? 1) > 0;
 
   // After every update: keep the tool steps in line with what the engine now says (my view and
   // my legal actions only). El Değiştir's pick and the Çal sheet follow view.self.pending.
@@ -876,6 +945,8 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
   function renderAll() {
     if (!applied || destroyed) return;
     const { view } = applied;
+    // During a round pause the hand, the loot and Fidye controls take no taps (decision Q79).
+    el.classList.toggle('is-paused', paused());
     roundTitle.textContent = t('table.roundTitle', view.round.index);
     doubleBadge.hidden = doubleMark(view) === null;
     renderSeats(view);
@@ -926,7 +997,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
       }
       const picked = picking !== null && picking.picks.includes(spot.id);
       const targetable = !sending && (picking ? picking.candidates.includes(spot.id) : mine && targets.includes(spot.id));
-      seat.kick.hidden = !canKick({ view, seatId: spot.id, mySeat, hostSeat, present });
+      seat.kick.hidden = paused() || !canKick({ view, seatId: spot.id, mySeat, hostSeat, present });
       renderSeatTools(seat, player, view);
       const cls = seat.el.classList;
       cls.toggle('is-me', spot.id === view.viewer);
@@ -999,7 +1070,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
   }
 
   function onSeatTap(id) {
-    if (sending || isPressing(press)) return;
+    if (sending || isPressing(press) || paused()) return;
     if (picking) {
       picking = { ...picking, picks: pickStep(picking.picks, id, picking) };
       renderAll();
@@ -1029,7 +1100,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
 
   // --- Ganimet (decision 63) ------------------------------------------------------------------
   // Only this device's own view has loots (view.self.loots), so only the looter draws anything.
-  const lootList = () => (applied ? lootCards(applied.view, applied.lootDeadlines, Date.now() + offset) : []);
+  const lootList = () => (applied ? lootCards(applied.view, applied.lootDeadlines, clockNow()) : []);
 
   function renderLoot() {
     const cards = lootList();
@@ -1046,7 +1117,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
       const index = kept ? keepLootPick(kept.index, card, kept.tool) : null;
       if (index === null) lootPicks.delete(card.victim);
       const over = card.ms === 0;
-      const key = JSON.stringify([card.tools, card.empty, index, lootSending, over, nameOf(card.victim)]);
+      const key = JSON.stringify([card.tools, card.empty, index, lootSending, over, paused(), nameOf(card.victim)]);
       let entry = lootEls.get(card.victim);
       if (!entry || entry.key !== key) {
         const built = buildLootCard(card, index);
@@ -1076,7 +1147,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
         h('div', { class: 'loot-empty' },
           h('span', { class: 'loot-empty-title', text: t('loot.lootEmpty') }),
           h('span', { class: 'loot-sub', text: t('loot.lootNothing') })),
-        h('button', { type: 'button', class: 'btn-loot btn-loot-ok', text: texts.button, disabled: lootSending || over, on: { click: () => sendLoot(lootAction(card, null)) } }));
+        h('button', { type: 'button', class: 'btn-loot btn-loot-ok', text: texts.button, disabled: lootSending || over || paused(), on: { click: () => sendLoot(lootAction(card, null)) } }));
     } else {
       const action = lootAction(card, index);
       body = h('div', { class: 'loot-row' },
@@ -1085,7 +1156,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
           class: item.index === index ? 'loot-tool is-picked' : 'loot-tool',
           'aria-label': item.name,
           'aria-pressed': String(item.index === index),
-          disabled: lootSending || over,
+          disabled: lootSending || over || paused(),
           on: {
             click: () => {
               const next = lootPick(index, item.index);
@@ -1095,7 +1166,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
             },
           },
         }, h('span', { class: 'loot-tool-badge' }, toolIcon(item.tool, 'small')), h('span', { class: 'loot-tool-name', text: item.name })))),
-        h('button', { type: 'button', class: 'btn-loot btn-loot-take', text: texts.button, disabled: lootSending || action === null, on: { click: () => sendLoot(lootAction(card, index)) } }));
+        h('button', { type: 'button', class: 'btn-loot btn-loot-take', text: texts.button, disabled: lootSending || action === null || paused(), on: { click: () => sendLoot(lootAction(card, index)) } }));
     }
     const el = h('section', { class: 'loot-card', 'aria-label': t('loot.lootLabel') },
       h('div', { class: 'loot-head' },
@@ -1128,7 +1199,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
 
   // The choice leaves this device only inside the lootChoice action (sent as my own seat).
   async function sendLoot(action) {
-    if (!action || lootSending) return;
+    if (!action || lootSending || paused()) return;
     lootSending = true;
     renderLoot();
     try {

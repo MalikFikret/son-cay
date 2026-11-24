@@ -4,7 +4,7 @@
 // (the "draft") and returns it. A rejected action returns the ORIGINAL state
 // object untouched, together with an error code.
 
-import { ENGINE_VERSION, ERR, MIN_PLAYERS, MAX_PLAYERS, PLAYER_ID_PATTERN } from './constants.js';
+import { ENGINE_VERSION, ERR, MIN_PLAYERS, MAX_PLAYERS, PLAYER_ID_PATTERN, ROUND_INTRO_MS } from './constants.js';
 import { clone, EngineError, isInt, isPlainObject, reject, requireAlivePlayer, requireTarget } from './util.js';
 import { validateConfig } from './config.js';
 import { randInt, seedToUint32, shuffleInPlace } from './rng.js';
@@ -69,7 +69,7 @@ export function createMatch(config, players, seed) {
     links: [],
     doublePending: false,
     phase: { type: 'turn' },
-    clock: { seq: 0, kind: 'none', playerId: null },
+    clock: { seq: 0, kind: 'none', playerId: null, pauseMs: 0 },
     shop: null,
     predictions: {},
   };
@@ -101,7 +101,8 @@ export function createMatch(config, players, seed) {
 
   const first = state.players[randInt(state, state.players.length)];
   state.turn = { playerId: first.id, number: 1, toolsUsed: 0 };
-  state.clock = { seq: 1, kind: 'shot', playerId: first.id };
+  // The first round's intro comes before the first turn (decision Q79).
+  state.clock = { seq: 1, kind: 'shot', playerId: first.id, pauseMs: ROUND_INTRO_MS };
   pub(ctx, 'turnStarted', { player: first.id, turn: 1 });
 
   return { ok: true, state, events: ctx.events };

@@ -152,11 +152,13 @@ export function revolverSeat({ target, view }) {
 
 /**
  * Milliseconds left in the current countdown (never below 0), or null when no countdown runs.
- * @param {{ clockAt: number, seconds: number, kind: string, serverNow: number }} info
+ * @param {{ clockAt: number, pauseMs?: number, seconds: number, kind: string, serverNow: number }} info
  */
-export function msLeft({ clockAt, seconds, kind, serverNow }) {
+export function msLeft({ clockAt, pauseMs = 0, seconds, kind, serverNow }) {
   if (kind === 'none' || typeof clockAt !== 'number' || typeof seconds !== 'number') return null;
-  return Math.max(0, clockAt + seconds * 1000 - serverNow);
+  // A round pause first (decision Q79): the countdown stands at its full time until it ends.
+  const start = clockAt + (Number.isFinite(pauseMs) && pauseMs > 0 ? pauseMs : 0);
+  return Math.max(0, Math.min(seconds * 1000, start + seconds * 1000 - serverNow));
 }
 
 /** Whole seconds shown on the countdown (rounded up: 0.2 s left shows 1). */

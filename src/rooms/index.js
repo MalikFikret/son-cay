@@ -25,6 +25,9 @@ export {
   createClockRunner,
   createLootRunner,
   lootDeadline,
+  pauseOf,
+  pauseWindow,
+  pausePhase,
   planTimeout,
   rememberClockAt,
 } from './clock.js';
@@ -49,3 +52,4 @@ export {
   paths,
   toDbValue,
 } from './schema.js';
+export { MATCH_PAUSED, PAUSE_GRACE_MS } from './match.js';

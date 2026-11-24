@@ -4,13 +4,13 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
-import { applyAction, createMatch, DEFAULT_SCORING, scoreMatch } from '../src/engine/index.js';
-import { ROOM_ERR, parseLog } from '../src/rooms/index.js';
+import { applyAction, createMatch, DEFAULT_SCORING, REFILL_PAUSE_MS, ROUND_INTRO_MS, scoreMatch } from '../src/engine/index.js';
+import { MATCH_PAUSED, ROOM_ERR, parseLog } from '../src/rooms/index.js';
 import { useRulesTestEnv } from './helpers.js';
 import { CODE, NOW, rejectsWithCode, roomFixtures, wait, waitFor } from './fixtures.js';
 
 const rt = useRulesTestEnv();
-const { roomsApi, liveRoomsApi, seedPresence, dumpRoom, write, seedRoom } = roomFixtures(rt);
+const { roomsApi, liveRoomsApi, fastForwardPause, seedPresence, dumpRoom, write, seedRoom } = roomFixtures(rt);
 
 const SEED = 12345;
 const UID = { s01: 'host', s02: 'bob', s03: 'carol' };
@@ -79,6 +79,86 @@ describe('clockAt', () => {
       return rest;
     }));
     await assertSucceeds(rawMove('bob', (m) => ({ ...m, clockAt: NOW })));
+  });
+});
+
+describe('round pauses (decision Q79)', () => {
+  // The api exactly as the game uses it (no fast-forward of the pause).
+  const paused = (uid) => liveRoomsApi(uid, { randomSeed: () => SEED, keepPauses: true }).api;
+
+  test('during the first round intro every move, timeout and kick is refused with MATCH_PAUSED and nothing is written', async () => {
+    await startedRoom();
+    const state = await stateOf();
+    assert.equal(state.clock.pauseMs, ROUND_INTRO_MS);
+    const turn = state.turn.playerId;
+    const other = state.players.find((p) => p.id !== turn).id;
+    const before = await matchOf();
+    const shot = await paused(UID[turn]).submitAction({ uid: UID[turn], code: CODE, action: { type: 'chooseTarget', target: other } });
+    assert.equal(shot.ok, false);
+    assert.equal(shot.error.code, MATCH_PAUSED);
+    assert.ok(shot.error.leftMs > 0 && shot.error.leftMs <= ROUND_INTRO_MS, `leftMs ${shot.error.leftMs}`);
+    const timeout = await paused(UID[other]).submitAction({ uid: UID[other], code: CODE, action: { type: 'timeout', seq: state.clock.seq } });
+    assert.equal(timeout.error.code, MATCH_PAUSED, 'a timeout sent early is refused');
+    // Another player's "any time" tool or a ransom action is refused alike.
+    const anyTime = await paused(UID[other]).submitAction({ uid: UID[other], code: CODE, action: { type: 'useTool', tool: 'heal' } });
+    assert.equal(anyTime.error.code, MATCH_PAUSED);
+    const kick = await paused('host').removeAbsentPlayer({ uid: 'host', code: CODE, seatId: 's02' });
+    assert.equal(kick.error.code, MATCH_PAUSED, 'the host cannot change play either');
+    assert.deepEqual(await matchOf(), before, 'nothing written');
+    // Once the intro is over (real time), the same shot is accepted.
+    await wait(shot.error.leftMs + 400);
+    const later = await paused(UID[turn]).submitAction({ uid: UID[turn], code: CODE, action: { type: 'chooseTarget', target: other } });
+    assert.equal(later.ok, true, JSON.stringify(later));
+  });
+
+  test('the shot that ends a round pauses the next countdown 9 s; moves are refused, then allowed again', async () => {
+    await startedRoom();
+    await fastForwardPause(CODE, ROUND_INTRO_MS);
+    // Fire until a write refills (the round's last Mermi), each at the turn player's next seat.
+    let refill = null;
+    for (let i = 0; i < 40 && refill === null; i += 1) {
+      const state = await stateOf();
+      if (state.status !== 'active') break;
+      const shooter = state.turn.playerId;
+      const target = state.players.find((p) => p.alive && p.id !== shooter).id;
+      const result = await paused(UID[shooter]).submitAction({ uid: UID[shooter], code: CODE, action: { type: 'chooseTarget', target } });
+      assert.equal(result.ok, true, JSON.stringify(result));
+      if (result.events.some((e) => e.type === 'reloaded')) refill = await stateOf();
+    }
+    assert.ok(refill, 'a round ended');
+    assert.equal(refill.clock.pauseMs, REFILL_PAUSE_MS);
+    const match = await matchOf();
+    const shooter = refill.turn.playerId;
+    const target = refill.players.find((p) => p.alive && p.id !== shooter).id;
+    const early = await paused(UID[shooter]).submitAction({ uid: UID[shooter], code: CODE, action: { type: 'chooseTarget', target } });
+    assert.equal(early.error.code, MATCH_PAUSED);
+    assert.ok(early.error.leftMs > ROUND_INTRO_MS && early.error.leftMs <= REFILL_PAUSE_MS, `leftMs ${early.error.leftMs}`);
+    assert.deepEqual(await matchOf(), match);
+    await fastForwardPause(CODE, early.error.leftMs);
+    const after = await paused(UID[shooter]).submitAction({ uid: UID[shooter], code: CODE, action: { type: 'chooseTarget', target } });
+    assert.equal(after.ok, true, JSON.stringify(after));
+  });
+
+  test('watchMatch: the loot of a kill that ends the round gets its 15 s after the pause', async () => {
+    // Covered as pure scheduling in tests/round-pause.test.js (lootDeadline); here the delivered
+    // deadline follows the stored pause for an open loot of mine.
+    await startedRoom();
+    const match = await matchOf();
+    const state = JSON.parse(match.stateJson);
+    const looter = state.players[0].id;
+    const victim = state.players[1].id;
+    // Seed an open loot on the paused countdown of the match start (as a round-ending kill would).
+    state.players[0].loots = [{ victim, clockSeq: state.clock.seq }];
+    await rt.withRulesDisabled((db) => db.ref(`rooms/${CODE}/match/stateJson`).set(JSON.stringify(state)));
+    const updates = [];
+    const stop = paused(UID[looter]).watchMatch({ uid: UID[looter], code: CODE, onUpdate: (u) => updates.push(u) });
+    try {
+      await waitFor(() => updates.length > 0, { what: 'a delivery' });
+      const last = updates.at(-1);
+      assert.equal(last.lootDeadlines[victim], last.clockAt + ROUND_INTRO_MS + 15000);
+    } finally {
+      stop();
+    }
   });
 });
 

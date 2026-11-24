@@ -2309,6 +2309,33 @@ li.tablo-row { min-height: 56px; }
 }
 
 /* Reload announcement: a moment in the middle of the table, then gone. */
+/* The round intro PLACEHOLDER (step 4.4d-a, decision Q79); the real screen comes next. */
+.intro-placeholder {
+  position: absolute;
+  left: 50%;
+  top: var(--cy, 50%);
+  transform: translate(-50%, -50%);
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 20px;
+  border-radius: 14px;
+  background-color: rgba(21, 16, 12, 0.92);
+  border: 1px solid var(--line);
+  text-align: center;
+}
+
+.intro-placeholder[hidden] { display: none; }
+.intro-placeholder-title { font-family: 'Rakkas', serif; font-size: 28px; color: var(--text); }
+.intro-placeholder-counts { font-size: 14px; color: var(--muted); }
+
+/* A round pause (decision Q79): the hand, loot and Fidye controls take no taps. */
+.table-screen.is-paused .hand,
+.table-screen.is-paused .loot-card button,
+.table-screen.is-paused .ransom-row button { pointer-events: none; }
+
 .reload-banner {
   position: absolute;
   z-index: 3;
