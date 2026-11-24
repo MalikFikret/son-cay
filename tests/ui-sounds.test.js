@@ -33,7 +33,7 @@ function fakeStorage(initial = {}) {
 
 /** A minimal Web Audio mock: every node connects; sources record start / stop. */
 function mockAudio({ state = 'running' } = {}) {
-  const log = { contexts: 0, started: 0, stopped: 0, resumed: 0, decoded: 0, starts: [] };
+  const log = { contexts: 0, started: 0, stopped: 0, resumed: 0, decoded: 0, starts: [], allStarts: [], ctx: null };
   const param = () => ({
     value: 0,
     setValueAtTime() {}, linearRampToValueAtTime() {}, exponentialRampToValueAtTime() {}, cancelScheduledValues() {},
@@ -41,13 +41,14 @@ function mockAudio({ state = 'running' } = {}) {
   const node = (extra = {}) => ({ connect() {}, disconnect() {}, ...extra });
   const source = (extra) => node({
     started: false,
-    start(at = 0) { this.started = true; log.started += 1; if (this.buffer?.clip) log.starts.push(at); },
+    start(at = 0) { this.started = true; log.started += 1; log.allStarts.push(at); if (this.buffer?.clip) log.starts.push(at); },
     stop() { if (this.started && !this.done) { this.done = true; log.stopped += 1; } },
     ...extra,
   });
   class FakeContext {
     constructor() {
       log.contexts += 1;
+      log.ctx = this;
       this.state = state;
       this.currentTime = 0;
       this.sampleRate = 8000;
@@ -260,6 +261,29 @@ describe('sound engine (mock Web Audio)', () => {
     engine.stopHammer();
     assert.equal(intervals.size, 0);
     assert.equal(engine.active('hammer'), 0);
+  });
+
+  test('hammer ticks keep a steady grid of the audio clock, one per chamber, and never play late', () => {
+    const { engine, audio, intervals } = engineFor();
+    engine.unlock();
+    engine.startHammer();
+    const [tick] = intervals.values();
+    const before = audio.log.allStarts.length;
+    tick();
+    tick();
+    tick();
+    // The timer fired three times while the audio clock stood still: three ticks, one chamber apart.
+    const times = [...new Set(audio.log.allStarts.slice(before).map((t) => t.toFixed(4)))].map(Number);
+    assert.equal(times.length, 3);
+    assert.ok(times[0] >= 0.2, 'the first tick after the clack');
+    for (let i = 1; i < times.length; i += 1) assert.ok(Math.abs(times[i] - times[i - 1] - HAMMER_TICK_MS / 1000) < 1e-9);
+    // A timer far behind the grid: the tick plays now, not in the past.
+    audio.log.ctx.currentTime = 5;
+    const late = audio.log.allStarts.length;
+    tick();
+    assert.ok(audio.log.allStarts.slice(late).every((t) => t >= 5));
+    engine.stopHammer();
+    assert.equal(engine.active('hammer'), 0, 'scheduled ticks stop with the press');
   });
 
   test('hammer switch off while pressing stops the ticks', () => {

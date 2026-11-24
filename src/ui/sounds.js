@@ -14,8 +14,11 @@
 // Three are SYNTHESIZED (oscillators, filtered noise, gain envelopes):
 // - reload: the Mermi pushed into the cylinder one by one, the cylinder closed and spun.
 // - turn: a short two-note chime when the turn becomes this player's.
-// - hammer: the hammer cocked at the start of a long press, then light ratchet ticks of the
-//   cylinder while the finger stays down (startHammer / stopHammer).
+// - hammer (decision Q76, redesigned to stand apart from reload): a heavy two-stage cock,
+//   "click-CLACK" (a light, high sear click, then 75 ms later a low, resonant clack), then soft,
+//   low, muffled ratchet ticks under the thumb, one per chamber of the spin at a steady rate,
+//   while the finger stays down (startHammer / stopHammer). Reload is the opposite: bright,
+//   metallic ticks around 2.5-3.8 kHz in an irregular, accelerating / slowing rhythm.
 //
 // Who hears what is decided by the table (screens/table.js); this module only plays. A sound plays
 // only while the "Ses" master switch AND its own switch are on (soundAllowed, device-settings.js);
@@ -36,12 +39,14 @@ import { SPIN_TURN_MS } from './press-signal.js';
 
 /** One ratchet tick per chamber while the revolver spins (six chambers per turn). */
 export const HAMMER_TICK_MS = Math.round(SPIN_TURN_MS / 6);
+/** The first tick comes after the clack has rung out (seconds after the cock starts). */
+const HAMMER_FIRST_TICK = 0.24;
 
 const SILENT = 0.0001; // exponential ramps cannot reach 0
 
 // Each sound's output level, measured offline so the gunshot is the loudest, the clicks clear but
 // smaller, and the chime soft (narrow band-passed noise loses most of its energy, hence > 1).
-const LEVELS = Object.freeze({ empty: 1.0, loaded: 2.6, reload: 1.0, turn: 1.0, hammer: 2.8 });
+const LEVELS = Object.freeze({ empty: 1.0, loaded: 2.6, reload: 1.0, turn: 1.0, hammer: 1.2 });
 
 /** The sounds that are audio files, and where they are (next to this module). */
 export const CLIP_IDS = Object.freeze(['loaded', 'empty']);
@@ -408,21 +413,38 @@ export function createSoundEngine({
       return 1.3;
     },
 
-    // The hammer drawn back: a low catch then the sharper latch.
+    // The hammer drawn back, "click-CLACK": a light, high sear click, then the hammer locking
+    // 75 ms later: a heavy, low clack with a body thump, a pitched-down knock and a metallic ring
+    // of the frame (around 1.1 / 1.7 kHz), lightly in the room. The signature of the sound.
     hammer(item, t) {
-      const dest = item.out;
-      burst(item, dest, t, { freq: 1700, q: 3, peak: 0.36, attack: 0.0008, decay: 0.016 });
-      tone(item, dest, t, { type: 'triangle', freq: 620, glideTo: 400, glide: 0.03, peak: 0.14, attack: 0.001, decay: 0.03 });
-      burst(item, dest, t + 0.048, { freq: 3300, q: 4, peak: 0.5, attack: 0.0005, decay: 0.013 });
-      tone(item, dest, t + 0.048, { freq: 2650, peak: 0.05, attack: 0.001, decay: 0.05 });
-      return 0.15;
+      const dest = withRoom(item, 0.14);
+      // The sear: a short, bright, resonant tick (a tone, so it stays audible next to the clack).
+      burst(item, dest, t, { freq: 3000, q: 2, peak: 0.8, attack: 0.0005, decay: 0.006 });
+      tone(item, dest, t, { freq: 3150, peak: 0.3, attack: 0.0004, decay: 0.012 });
+      tone(item, dest, t, { type: 'triangle', freq: 1850, peak: 0.18, attack: 0.0004, decay: 0.01 });
+      // The clack: mid-range impact (what a phone speaker plays), a body knock and the frame ring.
+      const clack = t + 0.075;
+      burst(item, dest, clack, { freq: 950, q: 2.2, peak: 1.0, attack: 0.0007, decay: 0.035 });
+      burst(item, dest, clack, { freq: 1600, q: 3, peak: 0.45, attack: 0.0006, decay: 0.02 });
+      burst(item, dest, clack, { type: 'lowpass', freq: 600, q: 0.8, peak: 0.45, attack: 0.001, decay: 0.05 });
+      tone(item, dest, clack, { type: 'triangle', freq: 300, glideTo: 190, glide: 0.06, peak: 0.4, attack: 0.001, decay: 0.12 });
+      tone(item, dest, clack, { freq: 130, glideTo: 85, glide: 0.06, peak: 0.2, attack: 0.0015, decay: 0.09 });
+      tone(item, dest, clack, { freq: 1130, peak: 0.16, attack: 0.001, decay: 0.14 });
+      tone(item, dest, clack, { freq: 1720, peak: 0.06, attack: 0.001, decay: 0.09 });
+      return 0.45;
     },
   };
 
-  /** One light ratchet tick of the cylinder (part of the hammer sound). */
-  function hammerTick(item, t) {
-    burst(item, item.out, t, { freq: 4500, q: 5, peak: 0.1 + random() * 0.04, attack: 0.0004, decay: 0.007 });
-    return 0.03;
+  /**
+   * One soft ratchet tick under the thumb (part of the hammer sound): low-passed noise and a dull
+   * low thud, no bright metal; at `at` on the audio clock (the steady grid startHammer keeps).
+   */
+  function hammerTick(item, t, { at = t } = {}) {
+    const when = Math.max(at, t);
+    burst(item, item.out, when, { type: 'lowpass', freq: 900, q: 0.7, peak: 0.24 + random() * 0.04, attack: 0.002, decay: 0.014 });
+    burst(item, item.out, when, { freq: 520, q: 1.5, peak: 0.14, attack: 0.002, decay: 0.012 });
+    tone(item, item.out, when, { freq: 230, glideTo: 170, glide: 0.02, peak: 0.035, attack: 0.002, decay: 0.02 });
+    return when - t + 0.05;
   }
 
   // --- Playing ---------------------------------------------------------------------------------
@@ -456,12 +478,20 @@ export function createSoundEngine({
     return start(id, SOUNDS[id], options);
   }
 
-  /** The long press began: the cock, then ratchet ticks until stopHammer(). */
+  /**
+   * The long press began: the cock, then one tick per chamber of the spin until stopHammer().
+   * The ticks sit on a steady grid of the audio clock (cock + HAMMER_FIRST_TICK + k ticks), so a
+   * late or early timer never bunches them; one late beyond the grid plays at once.
+   */
   function startHammer() {
     stopHammer();
     if (!play('hammer')) return false;
+    const base = ctx.currentTime + 0.005 + HAMMER_FIRST_TICK;
+    let k = 0;
     ticker = setI(() => {
-      if (!start('hammer', hammerTick)) stopHammer();
+      const at = base + (k * HAMMER_TICK_MS) / 1000;
+      k += 1;
+      if (!start('hammer', hammerTick, { at })) stopHammer();
     }, HAMMER_TICK_MS);
     return true;
   }
