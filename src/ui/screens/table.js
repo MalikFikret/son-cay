@@ -115,10 +115,11 @@ const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(pre
  *   onLost: this device lost its seat (SEAT_LOST / NOT_MEMBER / ROOM_NOT_FOUND);
  *   onBack: "Salona dön" was pressed on the end screen;
  *   onCloseRoom: the host confirmed "Masayı kapat" (decision Q67; shown to the host only, enabled
- *   during a match only while every other seat is absent: setRoom's closeRoom state)
+ *   during a match only while every other seat is absent: setRoom's closeRoom state);
+ *   onHome: "⋮ > Ana sayfa" (decision Q70): go to Giriş, keeping the seat
  * @returns {{ el: HTMLElement, setRoom(room: object): void, isEnded(): boolean, destroy(): void }}
  */
-export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, onLost, onBack, onCloseRoom }) {
+export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, onLost, onBack, onCloseRoom, onHome }) {
   let destroyed = false;
   const stops = [];
   const timers = new Set();
@@ -155,6 +156,58 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
   let ransomTool = null;
 
   // --- Static parts --------------------------------------------------------------------------
+  // "⋮" (decision Q70): an in-page menu with "Ana sayfa" (navigation only: the seat, presence
+  // and the match are untouched) and the not yet built "Ayarlar" / "Nasıl oynanır".
+  const menuButton = h('button', {
+    type: 'button', class: 'table-top-button is-square table-menu-button', 'aria-label': TEXT.tableMenu,
+    'aria-haspopup': 'menu', 'aria-expanded': 'false', 'aria-controls': 'table-menu',
+  }, svg(DOTS_VERTICAL));
+  const menuItem = (text, { onClick, disabled = false } = {}) => h('button', {
+    type: 'button', class: 'table-menu-item', role: 'menuitem', disabled, title: disabled ? TEXT.soon : null,
+    on: onClick ? { click: onClick } : undefined,
+  }, h('span', { text }), disabled ? h('span', { class: 'hint', text: TEXT.soon }) : null);
+  const menu = h('div', { class: 'table-menu', id: 'table-menu', role: 'menu', 'aria-label': TEXT.tableMenu, hidden: true },
+    menuItem(TEXT.menuHome, { onClick: () => { closeMenu(); if (onHome) onHome(); } }),
+    menuItem(TEXT.settings, { disabled: true }),
+    menuItem(TEXT.howToPlay, { disabled: true }));
+  const menuWrap = h('div', { class: 'table-menu-wrap' }, menuButton, menu);
+
+  function openMenu() {
+    menu.hidden = false;
+    menuButton.setAttribute('aria-expanded', 'true');
+    menu.querySelector('.table-menu-item:not(:disabled)')?.focus();
+  }
+  function closeMenu({ focus = false } = {}) {
+    if (menu.hidden) return;
+    menu.hidden = true;
+    menuButton.setAttribute('aria-expanded', 'false');
+    if (focus) menuButton.focus();
+  }
+  menuButton.addEventListener('click', (event) => {
+    event.stopPropagation();
+    if (menu.hidden) openMenu();
+    else closeMenu();
+  });
+  menu.addEventListener('keydown', (event) => {
+    const items = [...menu.querySelectorAll('.table-menu-item:not(:disabled)')];
+    const at = items.indexOf(document.activeElement);
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeMenu({ focus: true });
+    } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      const step = event.key === 'ArrowDown' ? 1 : -1;
+      items[(at + step + items.length) % items.length]?.focus();
+    } else if (event.key === 'Tab') {
+      closeMenu();
+    }
+  });
+  // A click anywhere outside the menu closes it.
+  const closeMenuOutside = (event) => {
+    if (!menuWrap.contains(event.target)) closeMenu();
+  };
+  document.addEventListener('click', closeMenuOutside);
+
   const roundTitle = h('span', { class: 'table-round' });
   const topBar = h('header', { class: 'table-top' },
     h('div', { class: 'table-top-text' },
@@ -162,9 +215,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
       h('span', { class: 'hint', text: TEXT.tableSubtitle(code, MODE_LABELS[mode] ?? '') })),
     h('div', { class: 'table-top-actions' },
       h('button', { type: 'button', class: 'table-top-button', text: TEXT.tablo, on: { click: () => openTablo() } }),
-      h('button', { type: 'button', class: 'table-top-button is-square', 'aria-label': TEXT.settings, disabled: true, title: TEXT.soon }, svg(GEAR)),
-      h('button', { type: 'button', class: 'table-top-button is-square', 'aria-label': TEXT.howToPlay, disabled: true, title: TEXT.soon },
-        h('span', { class: 'table-help', text: '?' }))));
+      menuWrap));
 
   const disc = h('div', { class: 'table-disc', 'aria-hidden': 'true' });
   const decor = svg(DECOR);
@@ -1403,6 +1454,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
       stealSheet.destroy();
       ransomSheet.destroy();
       document.removeEventListener('click', closeEffects);
+      document.removeEventListener('click', closeMenuOutside);
       clearInterval(tick);
       for (const id of timers) clearTimeout(id);
       timers.clear();
@@ -1435,7 +1487,8 @@ const CHAIN = ['svg', { width: 14, height: 12, viewBox: '0 0 14 12', fill: 'none
   ['rect', { x: 0.8, y: 3, width: 7, height: 6, rx: 3 }],
   ['rect', { x: 6.2, y: 3, width: 7, height: 6, rx: 3 }]];
 
-const GEAR = ['svg', { width: 20, height: 20, viewBox: '0 0 24 24', fill: 'none', stroke: '#EFE6D6', 'stroke-width': 1.8, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' },
-  ['circle', { cx: 12, cy: 12, r: 3.2 }],
-  ['path', { d: 'M12 2.5 V5 M12 19 V21.5 M2.5 12 H5 M19 12 H21.5 M5.3 5.3 L7.1 7.1 M16.9 16.9 L18.7 18.7 M5.3 18.7 L7.1 16.9 M16.9 7.1 L18.7 5.3' }],
-  ['circle', { cx: 12, cy: 12, r: 7 }]];
+// "⋮": three dots in a column (the table menu, decision Q70).
+const DOTS_VERTICAL = ['svg', { width: 20, height: 20, viewBox: '0 0 20 20', fill: '#EFE6D6', 'aria-hidden': 'true' },
+  ['circle', { cx: 10, cy: 4.5, r: 1.8 }],
+  ['circle', { cx: 10, cy: 10, r: 1.8 }],
+  ['circle', { cx: 10, cy: 15.5, r: 1.8 }]];

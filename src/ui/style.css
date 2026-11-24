@@ -1562,11 +1562,6 @@ li.tablo-row { min-height: 56px; }
 .table-top-button.is-square { width: 44px; padding: 0; }
 .table-top-button:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.table-help {
-  font-family: var(--font-display);
-  font-size: 22px;
-  line-height: 1;
-}
 
 /* The table: a 390-unit wide stage; JS sets its height and --cy (the table centre). */
 .table-stage {
@@ -2925,3 +2920,83 @@ li.tablo-row { min-height: 56px; }
 .shot-notice.is-private .shot-notice-effect { color: var(--text); }
 .shot-notice.is-private .shot-notice-fill { background-color: var(--text); }
 .tool-notice-name { color: var(--text); font-weight: 600; }
+
+/* --- The table menu "⋮" (decision Q70) ---------------------------------------------------- */
+
+.table-menu-wrap { position: relative; }
+
+.table-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 20;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background-color: var(--surface);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
+}
+
+.table-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.table-menu-item:hover:not(:disabled),
+.table-menu-item:focus-visible { background-color: rgba(239, 230, 214, 0.08); outline: none; }
+.table-menu-item:disabled { color: var(--muted); cursor: not-allowed; }
+.table-menu-item:disabled .hint { font-size: 12px; }
+
+/* --- "Masaya dön" on Giriş (decision Q70) ------------------------------------------------- */
+
+.home-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  margin: 0;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background-color: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.home-bar-title { font-weight: 600; }
+.home-bar-code { color: var(--muted); font-size: 13px; }
+.home-bar-end { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.home-bar .chevron path { stroke: var(--text); }
+
+/* My turn: red, like the Tablo's "Sıra sende" bar (it stands in for the fire button). */
+.home-bar.is-my-turn {
+  border-color: var(--danger);
+  background-color: var(--danger);
+}
+
+.home-bar.is-my-turn .home-bar-title {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.home-bar.is-my-turn .home-bar-code { color: var(--text); }

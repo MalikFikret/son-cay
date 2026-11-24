@@ -19,7 +19,7 @@
 import { h } from '../dom.js';
 import { copyText, errorLine, icon, screen } from '../components.js';
 import { FORM_MESSAGES, TEXT, errorMessage } from '../messages.js';
-import { inviteLink } from '../routes.js';
+import { hashFor, inviteLink } from '../routes.js';
 import {
   MODE_HINTS,
   MODE_LABELS,
@@ -50,7 +50,8 @@ import { ROOM_ERR } from '../../rooms/index.js';
 const LOST_CODES = [ROOM_ERR.SEAT_LOST, ROOM_ERR.NOT_MEMBER, ROOM_ERR.ROOM_NOT_FOUND];
 
 /**
- * @param {object} ctx  { api, uid, go, goHome(message, { info }), roomClosed(code), forgetTable(), refresh(message) }
+ * @param {object} ctx  { api, uid, go, goHome(message, { info }), roomClosed(code), forgetTable(), refresh(message),
+ *   keeper (seat-keeper.js), onSeatProblem(error) }
  * @param {object} view { active(), onLeave(fn) }
  * @param {{ code: string, mine: { seatId: string }, message?: string }} params
  */
@@ -134,9 +135,12 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
 
   // --- Live parts ----------------------------------------------------------------------------
   function start() {
+    // Presence and the host watcher belong to the seat, not to this screen (decision Q70): the
+    // seat keeper keeps them running while the player is on Giriş; this screen only receives
+    // their errors while it is shown, and runs its own clock (the table) meanwhile.
+    ctx.keeper.hold(code, mySeat, onLiveError);
+    ctx.keeper.back(onLiveError);
     try {
-      stops.push(ctx.api.startPresence({ uid: ctx.uid, code, seatId: mySeat, onError: onLiveError }));
-      stops.push(ctx.api.watchHost({ uid: ctx.uid, code, onError: onLiveError }));
       stops.push(ctx.api.watchLobby({ uid: ctx.uid, code, onUpdate: render, onError: onLiveError }));
     } catch (error) {
       onLiveError(error);
@@ -162,9 +166,12 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
     closeTable();
   }
 
+  // Leaving the screen (Giriş, browser back, ...) is navigation only: the seat keeper keeps the
+  // seat present and takes over this device's clock duties. Real leaving released it already.
   view.onLeave(() => {
     ended = true;
     stopAll();
+    ctx.keeper.away(ctx.onSeatProblem);
   });
 
   // Seat lost (kicked, recovered on another device) -> Giriş with the message; the table was
@@ -174,6 +181,7 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
     if (ended || leaving || !view.active()) return;
     if (LOST_CODES.includes(error?.code)) {
       ended = true;
+      ctx.keeper.release();
       stopAll();
       ctx.forgetTable();
       if (error?.code === ROOM_ERR.ROOM_NOT_FOUND) {
@@ -468,6 +476,7 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
       onLost: onLiveError,
       onBack: backToLobby,
       onCloseRoom: closeRoom,
+      onHome: () => ctx.go(hashFor.home()),
     });
     tableSawLobby = false;
     lobbyPart.hidden = true;
@@ -555,18 +564,22 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
       if (LOST_CODES.includes(failure?.code)) {
         // Nothing left to leave.
         ended = true;
+        ctx.keeper.release();
         stopAll();
         ctx.forgetTable();
         ctx.goHome();
         return;
       }
-      // leaveRoom stopped presence before it failed: draw the screen again, with the message.
+      // leaveRoom stopped presence before it failed: draw the screen again (the keeper starts
+      // presence again), with the message.
       ended = true;
+      ctx.keeper.release();
       stopAll();
       ctx.refresh(errorMessage(failure));
       return;
     }
     ended = true;
+    ctx.keeper.release();
     stopAll();
     ctx.forgetTable();
     if (view.active()) ctx.goHome();
@@ -584,6 +597,7 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
       leaving = false;
       if (!view.active()) return null;
       ended = true;
+      ctx.keeper.release();
       stopAll();
       if (failure?.code === ROOM_ERR.ROOM_NOT_FOUND) {
         ctx.forgetTable();
@@ -595,6 +609,7 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
       return null;
     }
     ended = true;
+    ctx.keeper.release();
     stopAll();
     ctx.forgetTable();
     if (view.active()) ctx.goHome(TEXT.roomClosedByMe, { info: true });

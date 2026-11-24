@@ -4,11 +4,17 @@
 // On page load: if this tab remembers a table code and the signed-in user still holds a seat
 // there, the tab goes straight back to that table; otherwise the code is forgotten (and if that
 // table was closed, its "Masa kapatıldı" notice is shown first).
+//
+// Away from the table (decision Q70): the seat keeper (seat-keeper.js) keeps this tab's seat
+// present while it shows another screen (Giriş with its "Masaya dön" bar, Hakkında). While seated,
+// another table cannot be created, joined or recovered ("Önce masana dön").
 
 import { replace } from './dom.js';
 import { loading, screen } from './components.js';
 import { connect } from './firebase.js';
 import { forgetCode, rememberCode, rememberedCode } from './memory.js';
+import { tableGuard } from './home-model.js';
+import { createSeatKeeper } from './seat-keeper.js';
 import { FORM_MESSAGES, errorMessage } from './messages.js';
 import { ROUTES, hashFor, parseRoute } from './routes.js';
 import { aboutScreen } from './screens/about.js';
@@ -56,6 +62,16 @@ const ctx = {
   /** This tab no longer holds a seat at its remembered table. */
   forgetTable() {
     forgetCode();
+  },
+  /** The seat keeper (set after connecting). */
+  keeper: null,
+  /**
+   * A problem with the held seat while no table screen receives it (decision Q70): a lost seat
+   * or a closed room forgets the table; on Giriş the bar goes away ("Masa kapatıldı" for a
+   * closed room, the seat-lost message otherwise).
+   */
+  onSeatProblem(error) {
+    seatProblem(error);
   },
   /** Draws the current route again, with an optional message on the screen it shows. */
   refresh(message) {
@@ -109,6 +125,29 @@ function showRoomClosed(code) {
     if (view.active()) goHome();
   }, ROOM_CLOSED_MS);
   view.onLeave(() => clearTimeout(timer));
+}
+
+const LOST_CODES = [ROOM_ERR.SEAT_LOST, ROOM_ERR.NOT_MEMBER, ROOM_ERR.ROOM_NOT_FOUND];
+
+async function seatProblem(error) {
+  if (!LOST_CODES.includes(error?.code)) return;
+  const held = ctx.keeper?.current();
+  if (!held) return;
+  ctx.keeper.release();
+  if (rememberedCode() === held.code) forgetCode();
+  const gone = error.code === ROOM_ERR.ROOM_NOT_FOUND || (await roomGone(held.code));
+  // Only Giriş shows anything about it (its bar); other screens simply forget the table.
+  if (parseRoute(location.hash).name !== ROUTES.HOME) return;
+  if (gone) showRoomClosed(held.code);
+  else goHome(errorMessage(ROOM_ERR.SEAT_LOST));
+}
+
+// One table per player (decision Q70): another table's route while seated goes to Giriş.
+function blockedByOwnTable(intent, code) {
+  const guard = tableGuard({ heldCode: ctx.keeper?.current()?.code ?? null, intent, code });
+  if (guard.allowed) return false;
+  goHome(intent === 'create' ? undefined : guard.message);
+  return true;
 }
 
 function tableProblem(code, failure) {
@@ -184,16 +223,20 @@ function route() {
       return;
     }
     case ROUTES.CREATE:
+      // Seated: back to Giriş (e.g. browser back from the table after creating it).
+      if (blockedByOwnTable('create')) return;
       show(sitScreen(ctx, view, {}), 'yeni masa');
       return;
     case ROUTES.ABOUT:
       show(aboutScreen(ctx, view), 'hakkında');
       return;
     case ROUTES.TABLE:
+      if (blockedByOwnTable('join', current.code)) return;
       canonicalize(hashFor.table(current.code));
       showTable(view, current.code);
       return;
     case ROUTES.RECOVER:
+      if (blockedByOwnTable('recover', current.code)) return;
       canonicalize(hashFor.recover(current.code));
       showRecover(view, current.code);
       return;
@@ -224,6 +267,9 @@ async function restoreRememberedTable() {
     if (home && (await roomGone(code))) history.replaceState(null, '', hashFor.table(code));
     return;
   }
+  // The seat is held from now on, whatever screen this tab shows (decision Q70).
+  ctx.keeper.hold(code, mine.seatId, ctx.onSeatProblem);
+  ctx.keeper.away(ctx.onSeatProblem);
   if (home) history.replaceState(null, '', hashFor.table(code));
 }
 
@@ -240,6 +286,7 @@ async function start() {
   showLoading('Bağlanıyor…');
   try {
     Object.assign(ctx, await connect());
+    ctx.keeper = createSeatKeeper({ api: ctx.api, uid: ctx.uid });
   } catch {
     show(problemScreen({
       title: TITLE,

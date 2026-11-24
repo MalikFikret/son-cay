@@ -96,6 +96,11 @@ export const TEXT = Object.freeze({
   shotNoticeAbsorbed: 'kalkan durdurdu',
   shotNoticeTwoShields: 'iki kalkan, kimse zarar görmedi',
   shotNoticeTurn: (name) => `Sıra: ${name}.`,
+  // Away from the table (decision Q70)
+  tableMenu: 'Menü',
+  menuHome: 'Ana sayfa',
+  backToYourTableFirst: 'Önce masana dön.',
+  homeBarTable: (code) => `Masa ${code}`,
   // Private tool result notice (decision Q69)
   toolNoticeLast: 'Son mermi',
   // Closing the table (decision Q67)

@@ -5,6 +5,8 @@ import { h } from '../dom.js';
 import { errorLine, icon, markInvalid, screen, whileBusy } from '../components.js';
 import { FORM_MESSAGES, errorMessage } from '../messages.js';
 import { codeFromText, hashFor } from '../routes.js';
+import { tableGuard } from '../home-model.js';
+import { createHomeBar } from '../home-bar.js';
 import { CODE_LENGTH } from '../../rooms/index.js';
 
 /**
@@ -12,6 +14,10 @@ import { CODE_LENGTH } from '../../rooms/index.js';
  *   action (neutral style, role status), otherwise it is an error
  */
 export function homeScreen(ctx, view, { message, info = false } = {}) {
+  // Seated at a table (decision Q70): the "Masaya dön" bar, and one table per player.
+  const held = ctx.keeper?.current() ?? null;
+  const bar = held ? createHomeBar(ctx, view, held) : null;
+
   const codeInput = h('input', {
     id: 'code', type: 'text', class: 'input input-code', maxlength: CODE_LENGTH, autocomplete: 'off',
     autocapitalize: 'characters', spellcheck: 'false', placeholder: '4KX9QZ', 'aria-describedby': 'code-error',
@@ -51,6 +57,10 @@ export function homeScreen(ctx, view, { message, info = false } = {}) {
     const code = codeFromText(typed);
     if (code === null) return showError(errorMessage('INVALID_CODE'));
     codeInput.value = code;
+    // One table per player: my own table opens; another one is refused before any request.
+    const guard = tableGuard({ heldCode: ctx.keeper?.current()?.code ?? null, intent: 'join', code });
+    if (guard.sameTable) return ctx.go(hashFor.table(code));
+    if (!guard.allowed) return showError(guard.message);
     try {
       // Check the table exists before leaving the screen, so a typo is shown right here.
       await whileBusy(join, 'Bir saniye…', () => ctx.api.getRoomSummary({ uid: ctx.uid, code }));
@@ -63,6 +73,16 @@ export function homeScreen(ctx, view, { message, info = false } = {}) {
 
   // A confirmation (e.g. "Masayı kapattın.") is not an error: shown in the neutral style.
   const infoLine = h('p', { class: 'field-error status-line', role: 'status', hidden: true });
+  function onCreate() {
+    const guard = tableGuard({ heldCode: ctx.keeper?.current()?.code ?? null, intent: 'create' });
+    if (!guard.allowed) {
+      error.show(guard.message);
+      infoLine.hidden = true;
+      return;
+    }
+    ctx.go(hashFor.create());
+  }
+
   if (message && info) {
     infoLine.textContent = message;
     infoLine.hidden = false;
@@ -79,7 +99,7 @@ export function homeScreen(ctx, view, { message, info = false } = {}) {
       infoLine),
     join,
     h('div', { class: 'divider' }, h('span', { class: 'rule' }), h('span', { text: 'ya da' }), h('span', { class: 'rule' })),
-    h('button', { type: 'button', class: 'btn btn-outline', text: 'Yeni masa kur', on: { click: () => ctx.go(hashFor.create()) } }),
+    h('button', { type: 'button', class: 'btn btn-outline', text: 'Yeni masa kur', on: { click: onCreate } }),
     h('div', { class: 'tile-row' },
       h('button', { type: 'button', class: 'btn-tile', disabled: true, title: 'Yakında' }, icon('book'), 'Nasıl oynanır'),
       h('button', { type: 'button', class: 'btn-tile', disabled: true, title: 'Yakında' }, icon('gear'), 'Ayarlar')),
@@ -90,6 +110,7 @@ export function homeScreen(ctx, view, { message, info = false } = {}) {
       h('a', { href: hashFor.about(), class: 'footer-link', text: 'Hakkında' })));
 
   return screen('screen-home',
+    bar,
     h('div', { class: 'brand' },
       icon('glass'),
       h('h1', { class: 'brand-title', text: 'Son Çay' }),
