@@ -5,7 +5,7 @@
 // Everything here works on what watchMatch gives this device (its own view, its own events and
 // its own legal actions), never on the raw match state.
 
-import { TEXT } from './messages.js';
+import { t } from './i18n/i18n.js';
 import { toolName } from './tools.js';
 import { toolTagsOf } from './tool-model.js';
 
@@ -171,11 +171,11 @@ export const URGENT_MS = 5000;
 export function statusText(view, nameOf) {
   if (!view) return '';
   if (view.status === 'ended') {
-    if (view.result?.type === 'win') return view.result.winner === view.viewer ? TEXT.youWon : TEXT.winnerIs(nameOf(view.result.winner));
-    return TEXT.drawResult;
+    if (view.result?.type === 'win') return view.result.winner === view.viewer ? t('table.youWon') : t('table.winnerIs', nameOf(view.result.winner));
+    return t('table.drawResult');
   }
-  if (view.turn.playerId === view.viewer) return TEXT.yourTurn;
-  return TEXT.turnOf(nameOf(view.turn.playerId));
+  if (view.turn.playerId === view.viewer) return t('table.yourTurn');
+  return t('table.turnOf', nameOf(view.turn.playerId));
 }
 
 /**
@@ -210,15 +210,15 @@ export function lastRound(events, previous = 0) {
  */
 export function seatTags(player, { viewerId, turnId, target, present, out, ended = false, links = [] }) {
   const tags = [];
-  if (player.id === viewerId) tags.push(TEXT.tagMe);
+  if (player.id === viewerId) tags.push(t('table.tagMe'));
   if (!player.alive) {
-    if (out) tags.push(out.removed ? TEXT.removedInRound(out.round) : TEXT.outInRound(out.round));
+    if (out) tags.push(out.removed ? t('tablo.removedInRound', out.round) : t('tablo.outInRound', out.round));
     return tags;
   }
-  if (player.id === target) tags.push(TEXT.tagTarget);
-  else if (!ended && player.id === turnId && player.id !== viewerId) tags.push(TEXT.tagTurn);
+  if (player.id === target) tags.push(t('table.tagTarget'));
+  else if (!ended && player.id === turnId && player.id !== viewerId) tags.push(t('table.tagTurn'));
   if (!ended) tags.push(...toolTagsOf(player, links));
-  if (!present) tags.push(TEXT.tagAbsent);
+  if (!present) tags.push(t('table.tagAbsent'));
   return tags;
 }
 
@@ -243,27 +243,27 @@ export function lastMove(events, nameOf) {
     }
   }
   if (index === -1) {
-    return list.some((e) => e.type === 'matchStarted') ? { lead: TEXT.matchBegan, effect: null, tail: '' } : null;
+    return list.some((e) => e.type === 'matchStarted') ? { lead: t('table.matchBegan'), effect: null, tail: '' } : null;
   }
   const e = list[index];
-  if (e.type === 'playerRemoved') return { lead: TEXT.playerRemovedLine(nameOf(e.player)), effect: null, tail: '' };
+  if (e.type === 'playerRemoved') return { lead: t('table.playerRemovedLine', nameOf(e.player)), effect: null, tail: '' };
   if (e.type === 'toolUsed') {
     const blocked = [];
     for (let i = index + 1; i < list.length && !MOVE_TYPES.includes(list[i].type); i += 1) {
       if (list[i].type === 'toolBlocked' && Array.isArray(list[i].blockedBy)) blocked.push(...list[i].blockedBy.map(nameOf));
     }
-    return { lead: toolUsedLine(e, nameOf), effect: null, tail: blocked.length > 0 ? TEXT.toolBlockedTail(blocked.join(TEXT.and)) : '' };
+    return { lead: toolUsedLine(e, nameOf), effect: null, tail: blocked.length > 0 ? t('tableTools.toolBlockedTail', t('common.andList', blocked)) : '' };
   }
-  if (e.type === 'turnSkipped') return { lead: TEXT.turnSkippedLine(nameOf(e.player)), effect: null, tail: '' };
+  if (e.type === 'turnSkipped') return { lead: t('table.turnSkippedLine', nameOf(e.player)), effect: null, tail: '' };
   // A ransom was accepted (public): never by whom or for what (decision 64).
-  if (e.type === 'jailReleased') return { lead: TEXT.jailReleasedLine(nameOf(e.player)), effect: null, tail: '' };
+  if (e.type === 'jailReleased') return { lead: t('ransom.jailReleasedLine', nameOf(e.player)), effect: null, tail: '' };
   let lead;
-  if (e.auto) lead = TEXT.shotOnTimeout(nameOf(e.shooter));
-  else if (e.target === e.shooter) lead = TEXT.shotAtSelf(nameOf(e.shooter));
-  else lead = TEXT.shotAtOther(nameOf(e.shooter), nameOf(e.target));
+  if (e.auto) lead = t('table.shotOnTimeout', nameOf(e.shooter));
+  else if (e.target === e.shooter) lead = t('table.shotAtSelf', nameOf(e.shooter));
+  else lead = t('table.shotAtOther', nameOf(e.shooter), nameOf(e.target));
   const out = [];
   for (let i = index + 1; i < list.length && !MOVE_TYPES.includes(list[i].type); i += 1) {
-    if (list[i].type === 'eliminated') out.push(TEXT.playerOut(nameOf(list[i].player)));
+    if (list[i].type === 'eliminated') out.push(t('table.playerOut', nameOf(list[i].player)));
   }
   return { lead, effect: e.effect === 'live' ? 'live' : 'blank', tail: out.join(' ') };
 }
@@ -275,9 +275,9 @@ export function lastMove(events, nameOf) {
  */
 export function toolUsedLine(e, nameOf) {
   let detail = '';
-  if (e.tool === 'link' && Array.isArray(e.targets) && e.targets.length === 2) detail = e.targets.map(nameOf).join(TEXT.and);
+  if (e.tool === 'link' && Array.isArray(e.targets) && e.targets.length === 2) detail = t('common.andList', e.targets.map(nameOf));
   else if ((e.tool === 'jail' || e.tool === 'steal' || e.tool === 'handSwap') && typeof e.target === 'string') detail = nameOf(e.target);
-  return TEXT.toolLine(nameOf(e.by), toolName(e.tool), detail);
+  return t('tableTools.toolLine', nameOf(e.by), toolName(e.tool), detail);
 }
 
 // --- Reload announcement -----------------------------------------------------------------------
@@ -289,7 +289,7 @@ export function toolUsedLine(e, nameOf) {
  */
 export function reloadText(counts) {
   if (!counts || !Number.isInteger(counts.live) || !Number.isInteger(counts.blank)) return null;
-  return { live: TEXT.reloadLive(counts.live), blank: TEXT.reloadBlank(counts.blank), text: `${TEXT.reloadLive(counts.live)} · ${TEXT.reloadBlank(counts.blank)}` };
+  return { live: t('table.reloadLive', counts.live), blank: t('table.reloadBlank', counts.blank), text: t('table.reloadCounts', counts.live, counts.blank) };
 }
 
 /**
@@ -347,7 +347,7 @@ export function directionArrows(cx, cy, r, direction) {
  */
 export function watchStrip(view) {
   if (!view || view.status !== 'active' || view.role === 'alive') return null;
-  return view.role === 'spectator' ? TEXT.watchingWaiting : TEXT.watching;
+  return view.role === 'spectator' ? t('table.watchingWaiting') : t('table.watching');
 }
 
 /**
@@ -371,13 +371,13 @@ export function canKick({ view, seatId, mySeat, hostSeat, present }) {
  */
 export function endHeadline(view, nameOf, outs = {}) {
   if (!view || view.status !== 'ended') return null;
-  if (view.result?.type !== 'win') return { title: TEXT.drawResult, line: TEXT.endNobody, sub: TEXT.endDrawLine };
+  if (view.result?.type !== 'win') return { title: t('table.drawResult'), line: t('end.endNobody'), sub: t('end.endDrawLine') };
   const winner = view.result.winner;
-  if (winner === view.viewer) return { title: TEXT.youWon, line: TEXT.endMine, sub: '' };
+  if (winner === view.viewer) return { title: t('table.youWon'), line: t('end.endMine'), sub: '' };
   const out = view.viewer ? outs[view.viewer] : null;
-  let line = TEXT.endWatched;
-  if (out) line = out.removed ? TEXT.endYouRemoved(out.round) : TEXT.endYouOut(out.round);
-  return { title: TEXT.winnerIs(nameOf(winner)), line, sub: TEXT.endLastTea(nameOf(winner)) };
+  let line = t('end.endWatched');
+  if (out) line = out.removed ? t('end.endYouRemoved', out.round) : t('end.endYouOut', out.round);
+  return { title: t('table.winnerIs', nameOf(winner)), line, sub: t('end.endLastTea', nameOf(winner)) };
 }
 
 /** The players eliminated after the last shot of the match (they share the place in a draw). */
@@ -407,11 +407,11 @@ export function endRanking(summary, { mySeat, nameOf, session, events }) {
     const sharesFirst = tied.includes(row.seatId);
     if (!(sharesFirst && i > 0 && tied.includes(summary.rows[i - 1].seatId))) place = i + 1;
     let status;
-    if (row.status === 'won') status = TEXT.wonRounds(summary.rounds);
-    else if (sharesFirst) status = TEXT.drawRounds(summary.rounds);
-    else if (row.status === 'removed') status = TEXT.removedInRound(row.outRound);
-    else if (row.status === 'eliminated') status = TEXT.outInRound(row.outRound);
-    else status = TEXT.inGame;
+    if (row.status === 'won') status = t('end.wonRounds', summary.rounds);
+    else if (sharesFirst) status = t('end.drawRounds', summary.rounds);
+    else if (row.status === 'removed') status = t('tablo.removedInRound', row.outRound);
+    else if (row.status === 'eliminated') status = t('tablo.outInRound', row.outRound);
+    else status = t('liveTablo.inGame');
     const total = stored ? session.rows.find((r) => r.seatId === row.seatId)?.points : undefined;
     return {
       seatId: row.seatId,
@@ -420,7 +420,7 @@ export function endRanking(summary, { mySeat, nameOf, session, events }) {
       me: row.seatId === mySeat,
       status,
       points: row.points,
-      total: typeof total === 'number' ? TEXT.sessionTotal(total) : '',
+      total: typeof total === 'number' ? t('end.sessionTotal', total) : '',
     };
   });
 }

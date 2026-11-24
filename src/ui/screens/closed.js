@@ -4,7 +4,7 @@
 
 import { h } from '../dom.js';
 import { header, icon, screen } from '../components.js';
-import { TEXT } from '../messages.js';
+import { t } from '../i18n/i18n.js';
 
 /** How long the notice stays before Giriş, in milliseconds. */
 export const ROOM_CLOSED_MS = 3500;
@@ -13,15 +13,15 @@ export const ROOM_CLOSED_MS = 3500;
  * @param {{ code: string, onHome: () => void }} params
  */
 export function closedScreen({ code, onHome }) {
-  const top = header({ title: `Masa ${code}`, onBack: onHome });
+  const top = header({ title: t('common.tableTitle', code), onBack: onHome });
   return screen('screen-problem', top.el,
     h('div', { class: 'stack' },
       h('div', { class: 'notice', role: 'status' },
         icon('info'),
         h('span', {},
-          h('strong', { text: TEXT.roomClosed }),
+          h('strong', { text: t('closeRoom.roomClosed') }),
           ' ',
-          TEXT.roomClosedSub))),
+          t('closeRoom.roomClosedSub')))),
     h('div', { class: 'bottom' },
-      h('button', { type: 'button', class: 'btn btn-primary', text: TEXT.toHome, on: { click: onHome } })));
+      h('button', { type: 'button', class: 'btn btn-primary', text: t('common.toHome'), on: { click: onHome } })));
 }

@@ -5,10 +5,9 @@
 import { h } from '../dom.js';
 import { errorLine, header, markInvalid, pinField, screen } from '../components.js';
 import { RETRY_WAIT_CODES, RETRY_WAIT_SECONDS, errorMessage } from '../messages.js';
+import { t } from '../i18n/i18n.js';
 import { hashFor } from '../routes.js';
 import { ROOM_ERR, isValidPin } from '../../rooms/index.js';
-
-const BUTTON_TEXT = 'Yerine dön';
 
 /**
  * @param {{ summary: { code, hostSeat, seats } }} params
@@ -18,7 +17,7 @@ export function recoverScreen(ctx, view, { summary }) {
   const pinError = errorLine('rerr');
   const seatError = errorLine('seat-error');
   pin.el.append(pinError.el);
-  const submit = h('button', { type: 'submit', class: 'btn btn-primary', text: BUTTON_TEXT });
+  const submit = h('button', { type: 'submit', class: 'btn btn-primary', text: t('recover.button') });
   let waitTimer = null;
   view.onLeave(() => clearInterval(waitTimer));
 
@@ -34,7 +33,7 @@ export function recoverScreen(ctx, view, { summary }) {
       radio,
       h('span', { class: 'seat-text' },
         h('span', { class: 'seat-name', text: seat.name }),
-        seat.seatId === summary.hostSeat ? h('span', { class: 'seat-tag', text: 'masa sahibi' }) : null));
+        seat.seatId === summary.hostSeat ? h('span', { class: 'seat-tag', text: t('recover.hostTag') }) : null));
   });
   const grid = h('div', { class: 'seat-grid' }, options);
 
@@ -47,21 +46,21 @@ export function recoverScreen(ctx, view, { summary }) {
     return grid.querySelector('input[name="seat"]:checked')?.value ?? null;
   }
 
-  // Disable the button and count down: "Bekle… 2", "Bekle… 1", then enabled again.
+  // Disable the button and count down ("Bekle… 2", "Bekle… 1"), then enabled again.
   function waitBeforeRetry() {
     let left = RETRY_WAIT_SECONDS;
     submit.disabled = true;
-    submit.textContent = `Bekle… ${left}`;
+    submit.textContent = t('recover.wait', left);
     clearInterval(waitTimer);
     waitTimer = setInterval(() => {
       left -= 1;
       if (left > 0) {
-        submit.textContent = `Bekle… ${left}`;
+        submit.textContent = t('recover.wait', left);
         return;
       }
       clearInterval(waitTimer);
       waitTimer = null;
-      submit.textContent = BUTTON_TEXT;
+      submit.textContent = t('recover.button');
       submit.disabled = false;
     }, 1000);
   }
@@ -78,7 +77,7 @@ export function recoverScreen(ctx, view, { summary }) {
       return;
     }
     submit.disabled = true;
-    submit.textContent = 'Bir saniye…';
+    submit.textContent = t('common.oneSecond');
     try {
       await ctx.api.recoverSeat({ uid: ctx.uid, code: summary.code, seatId, pin: pin.input.value });
     } catch (failure) {
@@ -94,7 +93,7 @@ export function recoverScreen(ctx, view, { summary }) {
         markInvalid(pin.input, failure.code === ROOM_ERR.WRONG_PIN);
         waitBeforeRetry();
       } else {
-        submit.textContent = BUTTON_TEXT;
+        submit.textContent = t('recover.button');
         submit.disabled = false;
       }
       return;
@@ -103,11 +102,11 @@ export function recoverScreen(ctx, view, { summary }) {
     if (view.active()) ctx.enterTable(summary.code);
   }
 
-  const top = header({ title: 'Yerine dön', subtitle: `Masa ${summary.code}`, onBack: () => ctx.go(hashFor.table(summary.code)) });
+  const top = header({ title: t('recover.title'), subtitle: t('common.tableTitle', summary.code), onBack: () => ctx.go(hashFor.table(summary.code)) });
   const form = h('form', { class: 'screen-form', novalidate: true, on: { submit: onSubmit } },
     h('div', { class: 'stack' },
       h('fieldset', { class: 'seat-fieldset', 'aria-describedby': 'seat-error' },
-        h('legend', { class: 'label', text: 'Adını seç' }),
+        h('legend', { class: 'label', text: t('recover.pickName') }),
         grid,
         seatError.el),
       pin.el),

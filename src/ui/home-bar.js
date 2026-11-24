@@ -9,7 +9,7 @@
 
 import { h } from './dom.js';
 import { icon } from './components.js';
-import { TEXT } from './messages.js';
+import { t } from './i18n/i18n.js';
 import { hashFor } from './routes.js';
 import { BAR, homeBarState } from './home-model.js';
 import { msLeft, secondsShown } from './table-model.js';
@@ -21,9 +21,9 @@ import { msLeft, secondsShown } from './table-model.js';
  * @returns {HTMLElement}
  */
 export function createHomeBar(ctx, view, held) {
-  const title = h('span', { class: 'home-bar-title', text: TEXT.backToTable });
+  const title = h('span', { class: 'home-bar-title', text: t('liveTablo.backToTable') });
   const seconds = h('span', { class: 'home-bar-seconds' });
-  const codeText = h('span', { class: 'home-bar-code', text: TEXT.homeBarTable(held.code) });
+  const codeText = h('span', { class: 'home-bar-code', text: t('away.homeBarTable', held.code) });
   const el = h('button', { type: 'button', class: 'home-bar' },
     title, seconds,
     h('span', { class: 'home-bar-end' }, codeText, icon('chevron')));
@@ -40,14 +40,14 @@ export function createHomeBar(ctx, view, held) {
     el.hidden = state.kind === BAR.HIDDEN;
     const myTurn = state.kind === BAR.MY_TURN;
     el.classList.toggle('is-my-turn', myTurn);
-    title.textContent = myTurn ? TEXT.yourTurn : TEXT.backToTable;
+    title.textContent = myTurn ? t('table.yourTurn') : t('liveTablo.backToTable');
     // Red bar: "Sıra sende · 17   Masaya dön · Masa CODE ›"; neutral: "Masaya dön   Masa CODE ›".
     const left = myTurn && match ? secondsShown(msLeft({
       clockAt: match.clockAt, seconds: match.view.config.shotTimeSeconds, kind: match.view.clock.kind, serverNow: Date.now() + offset,
     })) : null;
     seconds.textContent = left === null ? '' : `· ${left}`;
     seconds.hidden = left === null;
-    codeText.textContent = myTurn ? `${TEXT.backToTable} · ${TEXT.homeBarTable(held.code)}` : TEXT.homeBarTable(held.code);
+    codeText.textContent = myTurn ? t('away.homeBarBack', held.code) : t('away.homeBarTable', held.code);
   }
 
   try {

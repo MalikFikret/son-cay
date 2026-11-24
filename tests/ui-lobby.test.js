@@ -21,7 +21,9 @@ import {
   toolList,
 } from '../src/ui/lobby-model.js';
 import { WRITE_DELAY_MS, createSettingsSync } from '../src/ui/settings-sync.js';
-import { TOOL_NAMES } from '../src/ui/tools.js';
+import tr from '../src/ui/i18n/tr.js';
+
+const TOOL_NAMES = tr.tools.names;
 
 const classic = (patch = {}) => ({ ...defaultConfig('classic'), ...patch });
 

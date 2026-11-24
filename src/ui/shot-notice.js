@@ -8,7 +8,7 @@
 // kind. The engine's public `shot` event already lists every hit: { player, result: 'damage' |
 // 'reflected' | 'absorbed', amount?, hp?, via: 'direct' | 'link' | 'reflect' }.
 
-import { TEXT } from './messages.js';
+import { t } from './i18n/i18n.js';
 
 export const SHOT_NOTICE_BASE_MS = 3000;
 export const SHOT_NOTICE_ROW_MS = 1000;
@@ -46,12 +46,12 @@ export function shotNotice(events, nameOf) {
     for (const hit of hits) {
       const row = { player: hit.player, name: nameOf(hit.player), chain: hit.via === 'link', value: '', tone: 'damage' };
       if (hit.result === 'damage') {
-        row.value = TEXT.shotNoticeDamage(hit.amount) + (hit.hp === 0 ? ` ${TEXT.shotNoticeOut}` : '');
+        row.value = t('shotNotice.shotNoticeDamage', hit.amount) + (hit.hp === 0 ? ` ${t('shotNotice.shotNoticeOut')}` : '');
       } else if (hit.result === 'reflected') {
-        row.value = TEXT.shotNoticeReflected;
+        row.value = t('shotNotice.shotNoticeReflected');
         row.tone = 'shield';
       } else if (hit.result === 'absorbed') {
-        row.value = TEXT.shotNoticeAbsorbed;
+        row.value = t('shotNotice.shotNoticeAbsorbed');
         row.tone = 'shield';
       } else {
         continue;
@@ -60,12 +60,12 @@ export function shotNotice(events, nameOf) {
     }
     // The shooter's own shield stopped the reflected shot: two shields, nobody hurt.
     const twoShields = hits.some((hit) => hit.result === 'absorbed' && hit.via === 'reflect');
-    if (twoShields && !damaged) lines.push(TEXT.shotNoticeTwoShields);
+    if (twoShields && !damaged) lines.push(t('shotNotice.shotNoticeTwoShields'));
   } else {
     // Boş: whose turn it is now (the next public turnStarted; a blank on self keeps the turn).
     const next = after.find((event) => event.type === 'turnStarted');
     const player = next ? next.player : (self ? shot.shooter : null);
-    if (player) lines.push(TEXT.shotNoticeTurn(nameOf(player)));
+    if (player) lines.push(t('shotNotice.shotNoticeTurn', nameOf(player)));
   }
 
   return {
@@ -73,7 +73,7 @@ export function shotNotice(events, nameOf) {
     self,
     shooter: nameOf(shot.shooter),
     target: nameOf(shot.target),
-    word: live ? TEXT.shotNoticeLive : TEXT.shotNoticeBlank,
+    word: live ? t('shotNotice.shotNoticeLive') : t('shotNotice.shotNoticeBlank'),
     double: live && shot.doubled === true,
     rows,
     lines,

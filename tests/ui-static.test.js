@@ -45,14 +45,19 @@ describe('game UI sources', () => {
     }
   });
 
-  test('only memory.js touches browser storage, and it stores the table code only', () => {
+  test('only memory.js (the table code) and i18n/i18n.js (the language) touch browser storage', () => {
     for (const { name, text } of sources) {
-      if (name === 'memory.js') continue;
+      if (name === 'memory.js' || name === 'i18n/i18n.js') continue;
       assert.doesNotMatch(text, /\b(localStorage|sessionStorage|indexedDB|document\.cookie)\b/, name);
     }
     const memory = sources.find((s) => s.name === 'memory.js').text;
     assert.equal([...memory.matchAll(/setItem\(/g)].length, 1);
     assert.match(memory, /setItem\(KEY, code\)/);
+    // The language choice: one localStorage entry, nothing else.
+    const i18n = sources.find((s) => s.name === 'i18n/i18n.js').text;
+    assert.equal([...i18n.matchAll(/setItem\(/g)].length, 1);
+    assert.match(i18n, /localStorage\?\.setItem\(STORAGE_KEY, lang\)/);
+    assert.doesNotMatch(i18n, /\b(sessionStorage|indexedDB|document\.cookie)\b/);
   });
 });
 
@@ -180,5 +185,27 @@ describe('paths under a sub-path (GitHub Pages serves the game at /son-cay/)', (
         assert.ok(!value.startsWith('/'), `${url.pathname}: url(${value})`);
       }
     }
+  });
+});
+
+describe('Hakkında', async () => {
+  const text = readFileSync(new URL('src/ui/screens/about.js', root), 'utf8');
+  const html = readFileSync(new URL('index.html', root), 'utf8');
+  const { default: tr } = await import('../src/ui/i18n/tr.js');
+
+  test('shows the version number only (no commit hash) and no "Kaynak kodu" button', () => {
+    assert.match(text, /import \{ VERSION \} from '\.\.\/version\.js';/);
+    assert.doesNotMatch(stripComments(text), /\bCOMMIT\b/);
+    assert.doesNotMatch(text, /Kaynak kodu|SOURCE_URL/);
+  });
+
+  test('the description and the meta description', () => {
+    assert.equal(tr.about.intro, 'Arkadaşlarınla çevrimiçi oynanan bir taktik ve biraz da şans oyunu. Tabanca masanın ortasında döner, malzemeler oyunu değiştirir, son çay kimde kalırsa o kazanır.');
+    assert.match(text, /text: t\('about\.intro'\)/);
+    assert.ok(html.includes('<meta name="description" content="Son Çay: arkadaşlarınla çevrimiçi oynanan bir taktik ve biraz da şans oyunu.">'));
+    // The page sets the same description from the locale at start (i18n.js).
+    assert.ok(html.includes(`<meta name="description" content="${tr.meta.description}">`));
+    assert.ok(html.includes(`<title>${tr.app.name}</title>`));
+    assert.match(html, new RegExp(`<html lang="${tr.meta.language}"`));
   });
 });

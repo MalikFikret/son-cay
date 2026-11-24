@@ -10,8 +10,11 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { TOOL_IDS, eventsFor, listLegalActions, viewFor } from '../src/engine/index.js';
-import { TEXT } from '../src/ui/messages.js';
-import { TOOL_HELP, toolHelp, toolTags } from '../src/ui/tools.js';
+import { t } from '../src/ui/i18n/i18n.js';
+import { toolHelp, toolTags } from '../src/ui/tools.js';
+import tr from '../src/ui/i18n/tr.js';
+
+const TOOL_HELP = tr.tools.help;
 import {
   cardButton,
   chainPartners,
@@ -97,7 +100,7 @@ describe('hand state', () => {
   test('the counter follows the engine after a use; an empty hand says so', () => {
     const { state } = run(start, use('p1', 'detector'));
     assert.equal(handState(device(state, 'p1').view).used, 'bu sıra 1/3');
-    assert.equal(handState(device(start, 'p3').view).title, TEXT.handEmpty);
+    assert.equal(handState(device(start, 'p3').view).title, t('table.handEmpty'));
   });
 
   test('no hand for a spectator, an eliminated player or an ended match', () => {
@@ -151,7 +154,7 @@ describe('tool card button', () => {
 
   test('Çal with nothing else to give warns first and says "Yine de kullan"', () => {
     const alone = setup({ n: 3, hands: { p1: ['steal'], p2: ['heal'] } });
-    assert.deepEqual(button(alone, 'p1', 'steal'), { enabled: true, label: 'Yine de kullan', used: 'Bu sıra: 0/3 malzeme kullandın', warning: TEXT.stealNothingToGive });
+    assert.deepEqual(button(alone, 'p1', 'steal'), { enabled: true, label: 'Yine de kullan', used: 'Bu sıra: 0/3 malzeme kullandın', warning: t('tableTools.stealNothingToGive') });
     assert.equal(button(start, 'p1', 'steal').warning, null);
   });
 });
@@ -199,7 +202,7 @@ describe('picking a tool\'s targets', () => {
     assert.equal(pickBar({ tool: 'link', picks: [], need: 2, nameOf, mySeat: 'p1' }).sub, 'iki oyuncu seç');
     assert.equal(pickBar({ tool: 'link', picks: ['p1'], need: 2, nameOf, mySeat: 'p1' }).sub, 'kendin · ikinci oyuncuyu seç');
     assert.equal(pickBar({ tool: 'link', picks: ['p4', 'p2'], need: 2, nameOf, mySeat: 'p1' }).sub, 'Zeynep ve Kerem');
-    assert.equal(pickBar({ tool: 'handSwap', picks: [], need: 1, nameOf, mySeat: 'p1' }).sub, TEXT.pickSwap);
+    assert.equal(pickBar({ tool: 'handSwap', picks: [], need: 1, nameOf, mySeat: 'p1' }).sub, t('tableTools.pickSwap'));
   });
 });
 
@@ -436,7 +439,7 @@ describe('tool refusals', () => {
     assert.equal(toolErrorText({ code: 'TOOL_LIMIT_REACHED' }), 'Bu sıranın sınırı doldu');
     assert.equal(toolErrorText({ code: 'NOT_YOUR_TURN' }), 'Sıranı bekle');
     assert.equal(toolErrorText({ code: 'HP_FULL' }), 'Bardakların zaten tam');
-    assert.equal(toolErrorText({ code: 'SOMETHING' }), TEXT.toolRefused);
-    assert.equal(toolErrorText(undefined), TEXT.toolRefused);
+    assert.equal(toolErrorText({ code: 'SOMETHING' }), t('tableTools.toolRefused'));
+    assert.equal(toolErrorText(undefined), t('tableTools.toolRefused'));
   });
 });

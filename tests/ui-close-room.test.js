@@ -6,7 +6,7 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { othersAbsent } from '../src/rooms/index.js';
 import { closeRoomState } from '../src/ui/lobby-model.js';
-import { TEXT } from '../src/ui/messages.js';
+import { t } from '../src/ui/i18n/i18n.js';
 
 const seat = (uid) => ({ uid, name: uid, joinedAt: 1 });
 const SEATS = { s01: seat('host'), s02: seat('bob'), s03: seat('carol') };
@@ -52,12 +52,12 @@ describe('closeRoomState ("Masayı kapat")', () => {
   });
 
   test('during a match: disabled with the hint while another seat is present', () => {
-    assert.deepEqual(closeRoomState(room({ status: 'playing' })), { visible: true, enabled: false, hint: TEXT.closeRoomLocked });
-    assert.match(TEXT.closeRoomLocked, /Maç bitince/);
+    assert.deepEqual(closeRoomState(room({ status: 'playing' })), { visible: true, enabled: false, hint: t('closeRoom.closeRoomLocked') });
+    assert.match(t('closeRoom.closeRoomLocked'), /Maç bitince/);
   });
 
   test('during a match: enabled once every other seat is absent', () => {
     const state = closeRoomState(room({ status: 'playing', presence: { s01: on, s02: off } }));
-    assert.deepEqual(state, { visible: true, enabled: true, hint: TEXT.closeRoomAllAbsent });
+    assert.deepEqual(state, { visible: true, enabled: true, hint: t('closeRoom.closeRoomAllAbsent') });
   });
 });

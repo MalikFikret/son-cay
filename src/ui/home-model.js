@@ -2,7 +2,7 @@
 // the one-table-per-player guard. No DOM, no database.
 
 import { isValidRoomCode } from '../rooms/index.js';
-import { TEXT } from './messages.js';
+import { t } from './i18n/i18n.js';
 
 export const BAR = Object.freeze({ HIDDEN: 'hidden', NEUTRAL: 'neutral', MY_TURN: 'myTurn' });
 
@@ -35,5 +35,5 @@ export function homeBarState({ held, roomGone = false, seatLost = false, view = 
 export function tableGuard({ heldCode, intent, code = null }) {
   if (!heldCode) return { allowed: true, sameTable: false, message: null };
   if (intent !== 'create' && code === heldCode) return { allowed: true, sameTable: true, message: null };
-  return { allowed: false, sameTable: false, message: TEXT.backToYourTableFirst };
+  return { allowed: false, sameTable: false, message: t('away.backToYourTableFirst') };
 }

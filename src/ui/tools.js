@@ -1,6 +1,6 @@
-// The tools (malzemeler) as the player sees them: the approved Turkish names and the approved
-// badge icons. The one place for both: the waiting room uses them now; the hand, the tool card
-// and "Nasıl oynanır" will reuse them. The engine only knows the English ids (TOOL_IDS).
+// The tools (malzemeler) as the player sees them: their names, explanations and tags (from the
+// locale) and the approved badge icons, for every screen: the waiting room, the hand, the tool
+// card; "Nasıl oynanır" will reuse them. The engine only knows the English ids (TOOL_IDS).
 //
 // Icons: round badges, viewBox 80, background #1E1814, drawing in #EFE6D6 on a 48 grid moved by
 // 16. Frame turquoise (#3FB5AC), copper (#D6804A) for the three tools usable at any time (the
@@ -12,59 +12,11 @@
 
 import { TOOL_IDS, TOOL_INFO } from '../engine/index.js';
 import { svg } from './dom.js';
+import { t } from './i18n/i18n.js';
 
-/** tool id -> the approved Turkish name. */
-export const TOOL_NAMES = Object.freeze({
-  detector: 'Göz',
-  probe: 'Terazi',
-  counter: 'Sayaç',
-  skip: 'Kaydır',
-  swap: 'Hokkabaz',
-  flip: 'Mermi Çevir',
-  shuffle: 'Karıştır',
-  double: 'Çift Ateş',
-  reverse: 'Yön Değiştir',
-  link: 'Zincir',
-  jail: 'Hapis',
-  handSwap: 'El Değiştir',
-  steal: 'Çal',
-  shotShield: 'Mermi Kalkanı',
-  toolShield: 'Malzeme Kalkanı',
-  heal: 'Pansuman',
-});
-
-/**
- * tool id -> the approved one- or two-line explanation, copied as it is from the approved
- * "Nasıl oynanır · Malzemeler" mock (conversation 11, model 2). The tool card on the table uses
- * it now; "Nasıl oynanır" will use the same texts.
- */
-export const TOOL_HELP = Object.freeze({
-  detector: 'Şu anki merminin dolu mu boş mu olduğunu yalnız sana gösterir.',
-  probe: 'Şu anki mermiyle bir sonrakinin aynı mı, farklı mı olduğunu söyler.',
-  counter: 'Şu anki mermi ve sonraki ikisi içinde kaç dolu olduğunu söyler. Üçten az mermi kaldıysa kalanları sayar.',
-  skip: 'Şu anki mermiyi ateşlemeden bir sonrakine geçersin, sıra sende kalır. Geçtiğin mermiyi yalnız sen görürsün.',
-  swap: 'Şu anki mermiyle bir sonrakinin yerini, ikisini de açmadan değiştirir.',
-  flip: 'Şu anki mermiyi ters çalıştırır: dolu boş gibi, boş dolu gibi patlar. Herkes görünen sonucu sanar.',
-  shuffle: 'Kalan mermilerin sırasını rastgele karıştırır.',
-  double: 'Sonraki atış dolu çıkarsa iki bardak (can) götürür.',
-  reverse: 'Sıranın dönüş yönünü tersine çevirir.',
-  link: 'İki oyuncuyu tur sonuna kadar bağlar: birine gelen hasar ötekine de gelir. Kendini de bağlayabilirsin.',
-  jail: 'Seçtiğin oyuncunun bir sonraki sırası atlanır. Biri ondan fidye olarak bir malzeme kabul ederse çıkar.',
-  handSwap: 'Bütün malzemelerini başka bir oyuncunun malzemeleriyle değiştirirsin.',
-  steal: 'Bir oyuncunun malzemelerine bakar, birini alıp yerine kendinden birini verirsin. Baktığın anda harcanır.',
-  shotShield: 'Bu turda sana gelen ilk dolu mermiyi durdurur ve ateşleyene geri yollar. Bir sonraki sıradan itibaren çalışır.',
-  toolShield: 'Bu turda sana karşı kullanılan ilk malzemeyi boşa çıkarır. Bir sonraki sıradan itibaren çalışır.',
-  heal: 'Bir bardak geri kazanırsın. Başlangıçtaki bardak sayısını geçemezsin.',
-});
-
-/** The approved tags of the same mock: when a tool can be used and who sees it. */
-export const TOOL_TAG_TEXT = Object.freeze({
-  hidden: 'gizli',
-  announced: 'herkes görür',
-  stealAnnounced: 'herkes görür · ne aldığın gizli',
-  turn: 'sıranda',
-  anytime: 'her an',
-});
+// The approved names, explanations ("Nasıl oynanır · Malzemeler" mock, conversation 11 model 2;
+// the tool card uses them now, "Nasıl oynanır" will too) and card tags are locale entries keyed by
+// tool id: tools.names / tools.help / tools.tags in src/ui/i18n/.
 
 /**
  * The tags of a tool's card in a mode: timing first ("sıranda" / "her an"), then visibility
@@ -75,14 +27,14 @@ export function toolTags(tool, mode = 'classic') {
   if (!isTool(tool)) return [];
   const info = TOOL_INFO[tool];
   const hidden = info.hidden === 'always' || (info.hidden === 'classic' && mode === 'classic');
-  let visibility = hidden ? TOOL_TAG_TEXT.hidden : TOOL_TAG_TEXT.announced;
-  if (tool === 'steal') visibility = TOOL_TAG_TEXT.stealAnnounced;
-  return [info.timing === 'anytime' ? TOOL_TAG_TEXT.anytime : TOOL_TAG_TEXT.turn, visibility];
+  let visibility = hidden ? t('tools.tags.hidden') : t('tools.tags.announced');
+  if (tool === 'steal') visibility = t('tools.tags.stealAnnounced');
+  return [info.timing === 'anytime' ? t('tools.tags.anytime') : t('tools.tags.turn'), visibility];
 }
 
 /** The explanation of a tool, or '' for anything that is not a tool id. */
 export function toolHelp(tool) {
-  return isTool(tool) ? TOOL_HELP[tool] : '';
+  return isTool(tool) ? t(`tools.help.${tool}`) : '';
 }
 
 export const FRAME_TURQUOISE = '#3FB5AC';
@@ -296,16 +248,14 @@ export const TOOL_DRAWINGS = Object.freeze({
   },
 });
 
-const hasOwn = (object, k) => Object.prototype.hasOwnProperty.call(object, k);
-
 /** True only for an engine tool id (never for inherited keys such as 'constructor'). */
 export function isTool(tool) {
-  return typeof tool === 'string' && TOOL_IDS.includes(tool) && hasOwn(TOOL_NAMES, tool);
+  return typeof tool === 'string' && TOOL_IDS.includes(tool);
 }
 
-/** The Turkish name of a tool, or '' for anything that is not a tool id. */
+/** The name of a tool in the current language, or '' for anything that is not a tool id. */
 export function toolName(tool) {
-  return isTool(tool) ? TOOL_NAMES[tool] : '';
+  return isTool(tool) ? t(`tools.names.${tool}`) : '';
 }
 
 /** Copper frame for the tools usable at any time, turquoise for the others. */

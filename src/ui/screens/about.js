@@ -1,16 +1,16 @@
-// Hakkında: description, version (from the generated src/ui/version.js), developer, language,
-// source code, contact, privacy and copyright.
+// Hakkında: description, version (VERSION only, from the generated src/ui/version.js; the
+// stamped commit is not shown), developer, language, contact, privacy and copyright.
 
 import { h } from '../dom.js';
 import { header, screen } from '../components.js';
 import { hashFor } from '../routes.js';
-import { COMMIT, VERSION } from '../version.js';
+import { VERSION } from '../version.js';
+import { t } from '../i18n/i18n.js';
 
-const SOURCE_URL = 'https://github.com/MalikFikret/son-cay';
-
+// Contact labels: brand names stay as they are; `labelKey` is a locale key.
 const CONTACTS = [
   { label: 'GitHub', value: 'github.com/MalikFikret', href: 'https://github.com/MalikFikret' },
-  { label: 'E-posta', value: 'malikfikretcontact@gmail.com', href: 'mailto:malikfikretcontact@gmail.com' },
+  { labelKey: 'about.email', value: 'malikfikretcontact@gmail.com', href: 'mailto:malikfikretcontact@gmail.com' },
   { label: 'Instagram', value: '@malikfikret', href: 'https://instagram.com/malikfikret' },
   { label: 'LinkedIn', value: 'linkedin.com/in/malikfikret', href: 'https://linkedin.com/in/malikfikret' },
 ];
@@ -18,27 +18,25 @@ const CONTACTS = [
 const external = (href) => (href.startsWith('mailto:') ? {} : { target: '_blank', rel: 'noopener noreferrer' });
 
 export function aboutScreen(ctx) {
-  const version = COMMIT ? `${VERSION} (${COMMIT})` : VERSION;
-  const top = header({ title: 'Hakkında', subtitle: 'Son Çay', onBack: () => ctx.go(hashFor.home()) });
+  const top = header({ title: t('about.title'), subtitle: t('app.name'), onBack: () => ctx.go(hashFor.home()) });
   return screen('screen-about', top.el,
     h('div', { class: 'stack about' },
       h('div', { class: 'about-intro' },
-        h('p', { class: 'about-title', text: 'Son Çay' }),
-        h('p', { class: 'muted', text: 'Arkadaşlarınla çevrimiçi oynanan bir şans ve taktik oyunu. Tabanca masanın ortasında döner, malzemeler oyunu değiştirir, son çay kimde kalırsa o kazanır.' })),
+        h('p', { class: 'about-title', text: t('app.name') }),
+        h('p', { class: 'muted', text: t('about.intro') })),
       h('dl', { class: 'facts' },
-        h('dt', { text: 'Sürüm' }), h('dd', { text: version }),
-        h('dt', { text: 'Geliştirici' }), h('dd', { class: 'strong', text: 'Malik Fikret' }),
-        h('dt', { text: 'Dil' }), h('dd', { text: 'Türkçe' })),
-      h('a', { class: 'btn btn-outline', href: SOURCE_URL, ...external(SOURCE_URL), text: 'Kaynak kodu' }),
+        h('dt', { text: t('about.version') }), h('dd', { text: VERSION }),
+        h('dt', { text: t('about.developer') }), h('dd', { class: 'strong', text: t('about.developerName') }),
+        h('dt', { text: t('about.language') }), h('dd', { text: t('meta.languageName') })),
       h('section', { class: 'about-section' },
-        h('h2', { class: 'section-title', text: 'İletişim' }),
+        h('h2', { class: 'section-title', text: t('about.contact') }),
         CONTACTS.map((c) => h('a', { class: 'contact', href: c.href, ...external(c.href) },
-          h('span', { class: 'contact-label', text: c.label }),
+          h('span', { class: 'contact-label', text: c.labelKey ? t(c.labelKey) : c.label }),
           h('span', { class: 'contact-value', text: c.value })))),
       h('section', { class: 'about-section' },
-        h('h2', { class: 'section-title', text: 'Gizlilik' }),
-        h('p', { class: 'muted small', text: 'Hesap gerekmez. Her cihaz arka planda anonim bir kimlik alır. Yalnızca oyunun ihtiyaç duyduğu bilgiler saklanır: masa kodu, oyuncu adları, maçlardaki hamleler ve puanlar. Şifren diğer oyunculara hiçbir zaman gösterilmez.' })),
+        h('h2', { class: 'section-title', text: t('about.privacy') }),
+        h('p', { class: 'muted small', text: t('about.privacyText') })),
       h('div', { class: 'card' },
-        h('span', { class: 'strong', text: '© 2026 Malik Fikret. Tüm hakları saklıdır.' }),
-        h('span', { class: 'muted small', text: "Bu uygulamanın kodu, tasarımı ve metinleri Malik Fikret'e aittir. İzinsiz kopyalanamaz, değiştirilemez ve başka bir yerde yayımlanamaz." }))));
+        h('span', { class: 'strong', text: t('common.copyright') }),
+        h('span', { class: 'muted small', text: t('about.ownership') }))));
 }

@@ -29,12 +29,12 @@
 // Every listener, timer and animation stops in destroy().
 
 import { h, svg } from '../dom.js';
-import { ICONS, errorLine } from '../components.js';
+import { ICONS, errorLine, modeLabel } from '../components.js';
 import { createCloseRoom } from '../close-room.js';
 import { shotNotice } from '../shot-notice.js';
 import { toolNotice } from '../tool-notice.js';
-import { TEXT, errorMessage } from '../messages.js';
-import { MODE_LABELS } from '../lobby-model.js';
+import { errorMessage } from '../messages.js';
+import { t } from '../i18n/i18n.js';
 import { createSheet } from '../sheet.js';
 import { createTablo } from '../tablo.js';
 import { formatSigned, liveMatchView } from '../tablo-model.js';
@@ -159,17 +159,17 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
   // "⋮" (decision Q70): an in-page menu with "Ana sayfa" (navigation only: the seat, presence
   // and the match are untouched) and the not yet built "Ayarlar" / "Nasıl oynanır".
   const menuButton = h('button', {
-    type: 'button', class: 'table-top-button is-square table-menu-button', 'aria-label': TEXT.tableMenu,
+    type: 'button', class: 'table-top-button is-square table-menu-button', 'aria-label': t('away.tableMenu'),
     'aria-haspopup': 'menu', 'aria-expanded': 'false', 'aria-controls': 'table-menu',
   }, svg(DOTS_VERTICAL));
   const menuItem = (text, { onClick, disabled = false } = {}) => h('button', {
-    type: 'button', class: 'table-menu-item', role: 'menuitem', disabled, title: disabled ? TEXT.soon : null,
+    type: 'button', class: 'table-menu-item', role: 'menuitem', disabled, title: disabled ? t('common.soon') : null,
     on: onClick ? { click: onClick } : undefined,
-  }, h('span', { text }), disabled ? h('span', { class: 'hint', text: TEXT.soon }) : null);
-  const menu = h('div', { class: 'table-menu', id: 'table-menu', role: 'menu', 'aria-label': TEXT.tableMenu, hidden: true },
-    menuItem(TEXT.menuHome, { onClick: () => { closeMenu(); if (onHome) onHome(); } }),
-    menuItem(TEXT.settings, { disabled: true }),
-    menuItem(TEXT.howToPlay, { disabled: true }));
+  }, h('span', { text }), disabled ? h('span', { class: 'hint', text: t('common.soon') }) : null);
+  const menu = h('div', { class: 'table-menu', id: 'table-menu', role: 'menu', 'aria-label': t('away.tableMenu'), hidden: true },
+    menuItem(t('away.menuHome'), { onClick: () => { closeMenu(); if (onHome) onHome(); } }),
+    menuItem(t('common.settings'), { disabled: true }),
+    menuItem(t('common.howToPlay'), { disabled: true }));
   const menuWrap = h('div', { class: 'table-menu-wrap' }, menuButton, menu);
 
   function openMenu() {
@@ -212,9 +212,9 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
   const topBar = h('header', { class: 'table-top' },
     h('div', { class: 'table-top-text' },
       roundTitle,
-      h('span', { class: 'hint', text: TEXT.tableSubtitle(code, MODE_LABELS[mode] ?? '') })),
+      h('span', { class: 'hint', text: t('table.tableSubtitle', code, modeLabel(mode)) })),
     h('div', { class: 'table-top-actions' },
-      h('button', { type: 'button', class: 'table-top-button', text: TEXT.tablo, on: { click: () => openTablo() } }),
+      h('button', { type: 'button', class: 'table-top-button', text: t('tablo.tablo'), on: { click: () => openTablo() } }),
       menuWrap));
 
   const disc = h('div', { class: 'table-disc', 'aria-hidden': 'true' });
@@ -225,11 +225,11 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
   const reloadBlank = h('span', { class: 'reload-blank' });
   const reloadSr = h('span', { class: 'visually-hidden' });
   const reloadBanner = h('div', { class: 'reload-banner', 'aria-hidden': 'true', hidden: true },
-    h('span', { class: 'reload-kicker', text: TEXT.reloadLabel }),
+    h('span', { class: 'reload-kicker', text: t('table.reloadLabel') }),
     h('span', { class: 'reload-counts' }, reloadLive, h('span', { class: 'reload-dot', text: '·' }), reloadBlank));
   const reloadLive2 = h('p', { class: 'visually-hidden', role: 'status' }, reloadSr);
   // Çift Ateş: "×2" by the revolver until the next shot (public; decision 54, never red).
-  const doubleBadge = h('span', { class: 'double-badge', role: 'img', 'aria-label': TEXT.doubleLabel, text: TEXT.doubleMark, hidden: true });
+  const doubleBadge = h('span', { class: 'double-badge', role: 'img', 'aria-label': t('tableTools.doubleLabel'), text: t('tableTools.doubleMark'), hidden: true });
   const stage = h('div', { class: 'table-stage' }, disc, decor, arrows, revolverWrap, doubleBadge, reloadBanner);
   const seatEls = new Map(); // seatId -> { el, tag, name, lives, chains, bars }
 
@@ -246,7 +246,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
     h('div', { class: 'table-status-main', 'aria-live': 'polite' }, statusLine, lastLine), ring);
 
   // My own effects (decision 54): shields and detection results, small icons, tap to expand.
-  const effects = h('div', { class: 'effects', role: 'group', 'aria-label': TEXT.effectsLabel, hidden: true });
+  const effects = h('div', { class: 'effects', role: 'group', 'aria-label': t('tableTools.effectsLabel'), hidden: true });
   let effectsKey = null;
   const errors = errorLine('table-error');
   const strip = h('p', { class: 'watch-strip', role: 'status', hidden: true });
@@ -260,7 +260,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
   let ransomKey = null;
   const ransomText = h('span', { class: 'ransom-text' });
   const ransomOpen = h('button', { type: 'button', class: 'btn btn-outline ransom-open', on: { click: () => openRansom() } });
-  const ransomBack = h('button', { type: 'button', class: 'btn btn-outline ransom-withdraw', text: TEXT.ransomWithdraw, on: { click: () => sendRansom(withdrawAction()) } });
+  const ransomBack = h('button', { type: 'button', class: 'btn btn-outline ransom-withdraw', text: t('ransom.ransomWithdraw'), on: { click: () => sendRansom(withdrawAction()) } });
   const ransomBar = h('div', { class: 'ransom-row', hidden: true },
     h('span', { class: 'ransom-row-text' }, ransomText),
     h('div', { class: 'ransom-row-actions' }, ransomBack, ransomOpen));
@@ -278,8 +278,8 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
   // The pick bar (instead of the fire button while a tool's target is picked) and the Çal bar.
   const stepTitle = h('span', { class: 'step-title' });
   const stepSub = h('span', { class: 'step-sub' });
-  const stepCancel = h('button', { type: 'button', class: 'btn btn-outline step-cancel', text: TEXT.cancel, on: { click: () => cancelPick() } });
-  const stepGo = h('button', { type: 'button', class: 'btn btn-primary step-go', text: TEXT.use, on: { click: () => onStepGo() } });
+  const stepCancel = h('button', { type: 'button', class: 'btn btn-outline step-cancel', text: t('common.cancel'), on: { click: () => cancelPick() } });
+  const stepGo = h('button', { type: 'button', class: 'btn btn-primary step-go', text: t('tableTools.use'), on: { click: () => onStepGo() } });
   const stepBar = h('div', { class: 'step-bar', hidden: true, role: 'group' },
     h('div', { class: 'step-text', 'aria-live': 'polite' }, stepTitle, stepSub),
     h('div', { class: 'step-actions' }, stepCancel, stepGo));
@@ -305,19 +305,19 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
   const endLine = h('p', { class: 'end-line' });
   const endSub = h('p', { class: 'end-sub' });
   const endList = h('ol', { class: 'end-list' });
-  const backButton = h('button', { type: 'button', class: 'btn-back-lobby', text: TEXT.backToLobby, on: { click: () => onBack() } });
+  const backButton = h('button', { type: 'button', class: 'btn-back-lobby', text: t('end.backToLobby'), on: { click: () => onBack() } });
   const backNote = h('span', { class: 'hint center end-note', role: 'status' });
   const endTopLeft = h('span', { class: 'hint' });
   const endView = h('div', { class: 'end-screen', hidden: true },
-    h('div', { class: 'end-top' }, endTopLeft, h('span', { class: 'hint', text: TEXT.matchEnded })),
+    h('div', { class: 'end-top' }, endTopLeft, h('span', { class: 'hint', text: t('end.matchEnded') })),
     h('div', { class: 'end-head' }, endTitle, endLine, endSub),
-    h('section', { class: 'end-ranking', 'aria-label': TEXT.rankingLabel },
+    h('section', { class: 'end-ranking', 'aria-label': t('end.rankingLabel') },
       h('div', { class: 'end-ranking-head' },
-        h('span', { class: 'end-kicker', text: TEXT.rankingTitle }),
-        h('span', { class: 'hint end-cols', text: TEXT.rankingCols })),
+        h('span', { class: 'end-kicker', text: t('end.rankingTitle') }),
+        h('span', { class: 'hint end-cols', text: t('end.rankingCols') })),
       endList),
     h('div', { class: 'end-actions' },
-      h('button', { type: 'button', class: 'btn-end-tablo', text: TEXT.tablo, on: { click: () => openTablo() } }),
+      h('button', { type: 'button', class: 'btn-end-tablo', text: t('tablo.tablo'), on: { click: () => openTablo() } }),
       backButton),
     backNote);
 
@@ -348,9 +348,9 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
   // Kicking a disconnected player from the match: a one-line confirmation (host only).
   const kickSheet = createSheet({ title: '' });
   const kickError = errorLine('kick-error');
-  const kickYes = h('button', { type: 'button', class: 'btn btn-primary', text: TEXT.kickYes });
-  const kickNo = h('button', { type: 'button', class: 'btn btn-outline', text: TEXT.cancel, on: { click: () => kickSheet.close() } });
-  kickSheet.body.append(h('p', { class: 'muted', text: TEXT.kickMatchNote }), kickError.el, h('div', { class: 'dialog-actions' }, kickNo, kickYes));
+  const kickYes = h('button', { type: 'button', class: 'btn btn-primary', text: t('players.kickYes') });
+  const kickNo = h('button', { type: 'button', class: 'btn btn-outline', text: t('common.cancel'), on: { click: () => kickSheet.close() } });
+  kickSheet.body.append(h('p', { class: 'muted', text: t('kickMatch.kickMatchNote') }), kickError.el, h('div', { class: 'dialog-actions' }, kickNo, kickYes));
   let kickSeat = null;
   kickYes.addEventListener('click', async () => {
     if (!kickSeat || kickYes.disabled) return;
@@ -371,7 +371,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
   });
   function askKick(seatId) {
     kickSeat = seatId;
-    kickSheet.setTitle(TEXT.kickMatchConfirm(nameOf(seatId)));
+    kickSheet.setTitle(t('kickMatch.kickMatchConfirm', nameOf(seatId)));
     kickError.clear();
     kickSheet.open();
   }
@@ -386,7 +386,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
   const cardHelp = h('p', { class: 'tool-card-help' });
   const cardUsed = h('span', { class: 'hint tool-card-used' });
   const cardWarn = h('p', { class: 'tool-card-warn', role: 'note' });
-  const cardNo = h('button', { type: 'button', class: 'btn btn-outline tool-card-no', text: TEXT.cancel, on: { click: () => card.close() } });
+  const cardNo = h('button', { type: 'button', class: 'btn btn-outline tool-card-no', text: t('common.cancel'), on: { click: () => card.close() } });
   const cardYes = h('button', { type: 'button', class: 'btn btn-primary tool-card-yes', on: { click: () => onCardUse() } });
   card.body.append(h('div', { class: 'tool-card' }, cardIcon, cardName, cardTags, cardHelp, cardUsed, cardWarn,
     h('div', { class: 'tool-card-actions' }, cardNo, cardYes)));
@@ -412,7 +412,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
     cardUsed.hidden = !state.used;
     cardWarn.textContent = state.warning ?? '';
     cardWarn.hidden = !state.warning;
-    cardYes.textContent = sending && state.enabled ? TEXT.toolSending : state.label;
+    cardYes.textContent = sending && state.enabled ? t('tableTools.toolSending') : state.label;
     cardYes.disabled = !state.enabled || sending;
   }
 
@@ -474,9 +474,9 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
   // Çal after the look: the victim's tools, shown to me only, from my own view (self.pending).
   const stealSheet = createSheet({ title: '', className: 'steal-sheet' });
   const stealBody = h('div', { class: 'steal-body' });
-  const stealNo = h('button', { type: 'button', class: 'btn btn-outline', text: TEXT.stealNothing, on: { click: () => sendSteal(false) } });
-  const stealYes = h('button', { type: 'button', class: 'btn btn-primary', text: TEXT.stealExchange, on: { click: () => sendSteal(true) } });
-  stealSheet.body.append(h('p', { class: 'hint steal-note', text: TEXT.onlyYouSee }), stealBody,
+  const stealNo = h('button', { type: 'button', class: 'btn btn-outline', text: t('tableTools.stealNothing'), on: { click: () => sendSteal(false) } });
+  const stealYes = h('button', { type: 'button', class: 'btn btn-primary', text: t('tableTools.stealExchange'), on: { click: () => sendSteal(true) } });
+  stealSheet.body.append(h('p', { class: 'hint steal-note', text: t('tableTools.onlyYouSee') }), stealBody,
     h('div', { class: 'dialog-actions' }, stealNo, stealYes));
   let stealTake = null; // { index, tool } in the victim's list
   let stealGive = null; // { index, tool } in my hand
@@ -490,7 +490,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
   function renderSteal() {
     const pick = applied ? stealPick(applied.view) : null;
     if (!pick) return;
-    stealSheet.setTitle(TEXT.stealTitle(nameOf(pick.victim)));
+    stealSheet.setTitle(t('tableTools.stealTitle', nameOf(pick.victim)));
     if (stealTake && pick.tools[stealTake.index] !== stealTake.tool) stealTake = null;
     if (stealGive && pick.mine[stealGive.index] !== stealGive.tool) stealGive = null;
     const list = (tools, chosen, choose) => h('div', { class: 'steal-list' }, ...tools.map((tool, index) => h('button', {
@@ -502,11 +502,11 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
     }, toolIcon(tool, 'small'), h('span', { class: 'hand-name', text: toolName(tool) }))));
     const parts = [];
     if (pick.tools.length === 0) {
-      parts.push(h('p', { class: 'muted', text: TEXT.stealVictimEmpty(nameOf(pick.victim)) }));
+      parts.push(h('p', { class: 'muted', text: t('tableTools.stealVictimEmpty', nameOf(pick.victim)) }));
     } else {
-      parts.push(h('h3', { class: 'steal-head', text: TEXT.stealTake }), list(pick.tools, stealTake, (c) => { stealTake = c; }));
-      if (pick.mine.length === 0) parts.push(h('p', { class: 'muted', text: TEXT.stealMineEmpty }));
-      else parts.push(h('h3', { class: 'steal-head', text: TEXT.stealGive }), list(pick.mine, stealGive, (c) => { stealGive = c; }));
+      parts.push(h('h3', { class: 'steal-head', text: t('tableTools.stealTake') }), list(pick.tools, stealTake, (c) => { stealTake = c; }));
+      if (pick.mine.length === 0) parts.push(h('p', { class: 'muted', text: t('tableTools.stealMineEmpty') }));
+      else parts.push(h('h3', { class: 'steal-head', text: t('tableTools.stealGive') }), list(pick.mine, stealGive, (c) => { stealGive = c; }));
     }
     stealBody.replaceChildren(...parts);
     stealYes.hidden = pick.tools.length === 0 || pick.mine.length === 0;
@@ -525,11 +525,11 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
   }
 
   // The Fidye sheet (decision 64, built like Çal's): a living player, one of my tools, "Teklif et".
-  const ransomSheet = createSheet({ title: TEXT.ransomButton, className: 'steal-sheet ransom-sheet' });
+  const ransomSheet = createSheet({ title: t('ransom.ransomButton'), className: 'steal-sheet ransom-sheet' });
   const ransomBody = h('div', { class: 'steal-body' });
-  const ransomNo = h('button', { type: 'button', class: 'btn btn-outline', text: TEXT.cancel, on: { click: () => ransomSheet.close() } });
-  const ransomYes = h('button', { type: 'button', class: 'btn btn-primary', text: TEXT.ransomSend, on: { click: () => sendOffer() } });
-  ransomSheet.body.append(h('p', { class: 'hint steal-note', text: TEXT.ransomSheetNote }), ransomBody,
+  const ransomNo = h('button', { type: 'button', class: 'btn btn-outline', text: t('common.cancel'), on: { click: () => ransomSheet.close() } });
+  const ransomYes = h('button', { type: 'button', class: 'btn btn-primary', text: t('ransom.ransomSend'), on: { click: () => sendOffer() } });
+  ransomSheet.body.append(h('p', { class: 'hint steal-note', text: t('ransom.ransomSheetNote') }), ransomBody,
     h('div', { class: 'dialog-actions' }, ransomNo, ransomYes));
 
   function openRansom() {
@@ -561,8 +561,8 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
       on: { click: () => { ransomTool = ransomTool === tool ? null : tool; renderRansomSheet(); } },
     }, toolIcon(tool, 'small'), h('span', { class: 'hand-name', text: toolName(tool) }))));
     ransomBody.replaceChildren(
-      h('h3', { class: 'steal-head', text: TEXT.ransomTo }), players,
-      h('h3', { class: 'steal-head', text: TEXT.ransomWhich }), tools);
+      h('h3', { class: 'steal-head', text: t('ransom.ransomTo') }), players,
+      h('h3', { class: 'steal-head', text: t('ransom.ransomWhich') }), tools);
     ransomYes.disabled = ransomSending || offerAction({ to: ransomTo, tool: ransomTool }, choices) === null;
     ransomNo.disabled = ransomSending;
   }
@@ -627,19 +627,19 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
   function showShotNotice(notice) {
     const live = notice.kind === 'live';
     const head = notice.self
-      ? h('p', { class: 'shot-notice-head', text: TEXT.shotNoticeSelf(notice.shooter) })
+      ? h('p', { class: 'shot-notice-head', text: t('shotNotice.shotNoticeSelf', notice.shooter) })
       : h('p', { class: 'shot-notice-head' },
         h('span', { text: notice.shooter }),
         h('span', { class: 'shot-notice-arrow', text: ' → ' }),
         h('span', { text: notice.target }));
     const word = h('div', { class: 'shot-notice-word' },
       h('span', { class: 'shot-notice-effect', text: notice.word }),
-      notice.double ? h('span', { class: 'shot-notice-double', text: TEXT.shotNoticeDouble }) : null);
+      notice.double ? h('span', { class: 'shot-notice-double', text: t('shotNotice.shotNoticeDouble') }) : null);
     const rows = notice.rows.length > 0
       ? h('ul', { class: 'shot-notice-rows' }, notice.rows.map((row) => h('li', { class: 'shot-notice-row' },
         h('span', { class: 'shot-notice-name' },
           h('span', { text: row.name }),
-          row.chain ? h('span', { class: 'shot-notice-chain', text: ` ${TEXT.shotNoticeChain}` }) : null),
+          row.chain ? h('span', { class: 'shot-notice-chain', text: ` ${t('shotNotice.shotNoticeChain')}` }) : null),
         h('span', { class: row.tone === 'shield' ? 'shot-notice-value is-shield' : 'shot-notice-value', text: row.value }))))
       : null;
     const lines = notice.lines.map((line) => h('p', { class: 'shot-notice-line', text: line }));
@@ -658,7 +658,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
     const card = h('div', { class: 'shot-notice is-private' },
       h('p', { class: 'shot-notice-head' },
         h('span', { class: 'tool-notice-name', text: notice.name }),
-        h('span', { text: ` · ${TEXT.onlyYouSee}` })),
+        h('span', { text: ` · ${t('tableTools.onlyYouSee')}` })),
       h('div', { class: 'shot-notice-word' }, h('span', { class: 'shot-notice-effect', text: notice.word })),
       h('p', { class: 'shot-notice-line', text: notice.scope }),
       h('span', { class: 'shot-notice-bar', 'aria-hidden': 'true' }, fill));
@@ -807,7 +807,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
   function renderAll() {
     if (!applied || destroyed) return;
     const { view } = applied;
-    roundTitle.textContent = TEXT.roundTitle(view.round.index);
+    roundTitle.textContent = t('table.roundTitle', view.round.index);
     doubleBadge.hidden = doubleMark(view) === null;
     renderSeats(view);
     renderStatus(view);
@@ -846,7 +846,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
       const present = isSeatPresent(presence[spot.id]);
       const tags = seatTags(player, { viewerId: view.viewer, turnId, target, present, out: outs[spot.id], ended: view.status === 'ended', links: view.links });
       // El Değiştir: the tool COUNT of each player I may swap with (my screen only).
-      if (picking?.kind === 'handSwap' && Number.isInteger(picking.counts?.[spot.id])) tags.push(TEXT.toolCount(picking.counts[spot.id]));
+      if (picking?.kind === 'handSwap' && Number.isInteger(picking.counts?.[spot.id])) tags.push(t('tableTools.toolCount', picking.counts[spot.id]));
       seat.tag.textContent = tags.join(' · ');
       seat.tag.hidden = tags.length === 0;
       seat.name.textContent = nameOf(spot.id);
@@ -869,8 +869,8 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
       cls.toggle('is-targetable', targetable);
       seat.main.disabled = !targetable;
       seat.main.setAttribute('aria-pressed', String(spot.id === target || picked));
-      seat.main.setAttribute('aria-label', TEXT.seatLabel(nameOf(spot.id), tags.join(', '), TEXT.livesLabel(player.hp, view.config.hp)));
-      seat.kick.setAttribute('aria-label', TEXT.kickFromMatchFor(nameOf(spot.id)));
+      seat.main.setAttribute('aria-label', t('table.seatLabel', nameOf(spot.id), tags.join(', '), t('table.livesLabel', player.hp, view.config.hp)));
+      seat.kick.setAttribute('aria-label', t('kickMatch.kickFromMatchFor', nameOf(spot.id)));
       seat.spot = spot;
     }
     for (const [id, seat] of seatEls) {
@@ -881,7 +881,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
     }
     // Turn direction (1 = clockwise on the screen, the engine's seat order).
     arrows.setAttribute('viewBox', `0 0 ${STAGE_WIDTH} ${layout.height}`);
-    arrows.setAttribute('aria-label', view.direction === -1 ? TEXT.directionCounter : TEXT.directionClockwise);
+    arrows.setAttribute('aria-label', view.direction === -1 ? t('table.directionCounter') : t('table.directionClockwise'));
     arrows.replaceChildren(...directionArrows(layout.cx, layout.cy, 146, view.direction).flatMap(({ arc, head }) => [
       svg(['path', { d: arc, class: 'arrow-line' }]), svg(['path', { d: head, class: 'arrow-line' }]),
     ]));
@@ -894,7 +894,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
     // The seat box holds the target button and, for the host, the kick button (never nested).
     const main = h('button', { type: 'button', class: 'seat-main' }, tag, name, lives);
     main.addEventListener('click', () => onSeatTap(id));
-    const kick = h('button', { type: 'button', class: 'seat-kick', text: TEXT.kickFromMatch, hidden: true, on: { click: () => askKick(id) } });
+    const kick = h('button', { type: 'button', class: 'seat-kick', text: t('kickMatch.kickFromMatch'), hidden: true, on: { click: () => askKick(id) } });
     // Hapis: bars in the corner (decision 54). Zincir: one badge per link (decision 58).
     const bars = h('span', { class: 'seat-bars', 'aria-hidden': 'true', hidden: true }, svg(JAIL_BARS));
     const chains = h('div', { class: 'seat-chains', hidden: true });
@@ -915,7 +915,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
     seat.chainKey = key;
     seat.chains.hidden = partners.length === 0;
     seat.chains.replaceChildren(...partners.map((other) => h('button', {
-      type: 'button', class: 'seat-chain', 'aria-label': TEXT.chainWith(nameOf(other)), on: { click: () => flashSeat(other) },
+      type: 'button', class: 'seat-chain', 'aria-label': t('tableTools.chainWith', nameOf(other)), on: { click: () => flashSeat(other) },
     }, svg(CHAIN), h('span', { class: 'seat-chain-name', text: nameOf(other) }))));
   }
 
@@ -943,14 +943,14 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
 
   function renderStatus(view) {
     statusLine.textContent = statusText(view, nameOf);
-    const move = view.status === 'ended' ? { lead: TEXT.matchOver, effect: null, tail: '' } : lastMove(events, nameOf);
+    const move = view.status === 'ended' ? { lead: t('table.matchOver'), effect: null, tail: '' } : lastMove(events, nameOf);
     if (move === null) {
       lastLine.replaceChildren();
     } else {
       lastLine.replaceChildren(
-        TEXT.lastEventPrefix + move.lead,
+        t('table.lastEvent', move.lead),
         move.effect ? ' ' : '',
-        move.effect ? h('span', { class: move.effect === 'live' ? 'effect-live' : 'effect-blank', text: move.effect === 'live' ? TEXT.effectLive : TEXT.effectBlank }) : '',
+        move.effect ? h('span', { class: move.effect === 'live' ? 'effect-live' : 'effect-blank', text: move.effect === 'live' ? t('table.effectLive') : t('table.effectBlank') }) : '',
         move.tail ? ` ${move.tail}` : '');
     }
     const watching = watchStrip(view);
@@ -1005,8 +1005,8 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
     if (card.empty) {
       body = h('div', { class: 'loot-row' },
         h('div', { class: 'loot-empty' },
-          h('span', { class: 'loot-empty-title', text: TEXT.lootEmpty }),
-          h('span', { class: 'loot-sub', text: TEXT.lootNothing })),
+          h('span', { class: 'loot-empty-title', text: t('loot.lootEmpty') }),
+          h('span', { class: 'loot-sub', text: t('loot.lootNothing') })),
         h('button', { type: 'button', class: 'btn-loot btn-loot-ok', text: texts.button, disabled: lootSending || over, on: { click: () => sendLoot(lootAction(card, null)) } }));
     } else {
       const action = lootAction(card, index);
@@ -1028,7 +1028,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
         }, h('span', { class: 'loot-tool-badge' }, toolIcon(item.tool, 'small')), h('span', { class: 'loot-tool-name', text: item.name })))),
         h('button', { type: 'button', class: 'btn-loot btn-loot-take', text: texts.button, disabled: lootSending || action === null, on: { click: () => sendLoot(lootAction(card, index)) } }));
     }
-    const el = h('section', { class: 'loot-card', 'aria-label': TEXT.lootLabel },
+    const el = h('section', { class: 'loot-card', 'aria-label': t('loot.lootLabel') },
       h('div', { class: 'loot-head' },
         h('div', { class: 'loot-head-text' },
           h('span', { class: 'loot-title', text: texts.title }),
@@ -1048,7 +1048,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
       entry.ring.hidden = card.seconds === null;
       if (card.seconds !== null) {
         entry.seconds.textContent = String(card.seconds);
-        entry.seconds.setAttribute('aria-label', TEXT.secondsLeft(card.seconds));
+        entry.seconds.setAttribute('aria-label', t('table.secondsLeft', card.seconds));
         entry.ringBar.setAttribute('stroke-dasharray', `${(card.fraction * LOOT_RING).toFixed(1)} ${LOOT_RING.toFixed(1)}`);
       }
       // The time is up: the buttons go off (the expiry from runMatchClock then closes the card).
@@ -1083,8 +1083,8 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
     if (row === null) {
       ransomSheet.close();
     } else {
-      ransomText.textContent = row.pending ? pendingText(row.pending, nameOf) : TEXT.ransomHint;
-      ransomOpen.textContent = row.pending ? TEXT.ransomChange : TEXT.ransomButton;
+      ransomText.textContent = row.pending ? pendingText(row.pending, nameOf) : t('ransom.ransomHint');
+      ransomOpen.textContent = row.pending ? t('ransom.ransomChange') : t('ransom.ransomButton');
       ransomOpen.hidden = !row.canOffer;
       ransomOpen.disabled = ransomSending;
       ransomBack.hidden = !row.pending;
@@ -1096,20 +1096,20 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
     if (key === ransomKey) return;
     ransomKey = key;
     ransomWrap.hidden = cards.length === 0;
-    ransomWrap.replaceChildren(...cards.map((card) => h('section', { class: 'loot-card ransom-card', 'aria-label': TEXT.ransomButton },
+    ransomWrap.replaceChildren(...cards.map((card) => h('section', { class: 'loot-card ransom-card', 'aria-label': t('ransom.ransomButton') },
       h('div', { class: 'loot-head' },
         h('div', { class: 'loot-head-text' },
-          h('span', { class: 'loot-title', text: TEXT.ransomIncomingTitle(nameOf(card.from)) }),
-          h('span', { class: 'loot-sub', text: TEXT.ransomIncomingSub }))),
+          h('span', { class: 'loot-title', text: t('ransom.ransomIncomingTitle', nameOf(card.from)) }),
+          h('span', { class: 'loot-sub', text: t('ransom.ransomIncomingSub') }))),
       h('div', { class: 'loot-row' },
         h('div', { class: 'loot-tools' },
           h('span', { class: 'loot-tool ransom-tool' },
             h('span', { class: 'loot-tool-badge' }, toolIcon(card.tool, 'small')),
             h('span', { class: 'loot-tool-name', text: card.name }))),
         h('div', { class: 'ransom-actions' },
-          h('button', { type: 'button', class: 'btn-loot btn-loot-ok', text: TEXT.ransomReject, disabled: ransomSending, on: { click: () => sendRansom(rejectAction(card)) } }),
+          h('button', { type: 'button', class: 'btn-loot btn-loot-ok', text: t('ransom.ransomReject'), disabled: ransomSending, on: { click: () => sendRansom(rejectAction(card)) } }),
           // Always enabled: whether the offer is still funded is the offerer's secret.
-          h('button', { type: 'button', class: 'btn-loot btn-loot-take', text: TEXT.ransomAccept, disabled: ransomSending, on: { click: () => sendRansom(acceptAction(card)) } }))))));
+          h('button', { type: 'button', class: 'btn-loot btn-loot-take', text: t('ransom.ransomAccept'), disabled: ransomSending, on: { click: () => sendRansom(acceptAction(card)) } }))))));
   }
 
   // My hand (decision 54): small badges on every turn, turn tools faded on others' turns, and on
@@ -1179,7 +1179,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
       stepTitle.textContent = toolName('steal');
       stepSub.textContent = nameOf(steal.victim);
       stepCancel.hidden = true;
-      stepGo.textContent = sending ? TEXT.toolSending : TEXT.stealPending;
+      stepGo.textContent = sending ? t('tableTools.toolSending') : t('tableTools.stealPending');
       stepGo.disabled = sending;
       return;
     }
@@ -1193,7 +1193,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
     stepSub.textContent = bar.sub;
     stepCancel.hidden = picking.kind === 'handSwap'; // El Değiştir is already spent
     stepCancel.disabled = sending;
-    stepGo.textContent = sending ? TEXT.toolSending : TEXT.use;
+    stepGo.textContent = sending ? t('tableTools.toolSending') : t('tableTools.use');
     stepGo.disabled = sending || !bar.ready;
   }
 
@@ -1205,11 +1205,11 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
     fireButton.disabled = !canFire() && !pressing;
     fireButton.classList.toggle('is-ready', target !== null);
     fireButton.classList.toggle('is-pressing', pressing);
-    fireMain.textContent = target === null ? TEXT.chooseTarget : TEXT.fire;
-    if (sending) fireSub.textContent = TEXT.firing;
-    else if (pressing) fireSub.textContent = TEXT.slideToCancel;
-    else if (target === null) fireSub.textContent = TEXT.chooseTargetHint;
-    else fireSub.textContent = target === mySeat ? TEXT.targetSelf : TEXT.targetIs(nameOf(target));
+    fireMain.textContent = target === null ? t('table.chooseTarget') : t('table.fire');
+    if (sending) fireSub.textContent = t('table.firing');
+    else if (pressing) fireSub.textContent = t('table.slideToCancel');
+    else if (target === null) fireSub.textContent = t('table.chooseTargetHint');
+    else fireSub.textContent = target === mySeat ? t('table.targetSelf') : t('table.targetIs', nameOf(target));
   }
 
   function updateClock() {
@@ -1220,7 +1220,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
       const total = applied.view.config.shotTimeSeconds * 1000;
       const seconds = secondsShown(ms);
       ringText.textContent = String(seconds);
-      ring.setAttribute('aria-label', TEXT.secondsLeft(seconds));
+      ring.setAttribute('aria-label', t('table.secondsLeft', seconds));
       ringBar.setAttribute('stroke-dasharray', `${((ms / total) * RING).toFixed(1)} ${RING.toFixed(1)}`);
       ring.classList.toggle('is-mine', applied.view.clock.playerId === mySeat);
     }
@@ -1246,7 +1246,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
     angle = next;
     // Always the same function list, so the turn (and the mirror flip) interpolates smoothly.
     revolverWrap.style.transform = `rotate(${next.toFixed(1)}deg) scaleY(${pointsLeft(next) ? -1 : 1})`;
-    revolverWrap.setAttribute('aria-label', TEXT.revolverAt(nameOf(seatId)));
+    revolverWrap.setAttribute('aria-label', t('table.revolverAt', nameOf(seatId)));
     return moved;
   }
 
@@ -1282,7 +1282,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
   function showReload({ live, blank, text }) {
     reloadLive.textContent = live;
     reloadBlank.textContent = blank;
-    reloadSr.textContent = `${TEXT.reloadLabel}: ${text}`;
+    reloadSr.textContent = t('table.reloadAnnounced', text);
     reloadBanner.hidden = false;
     reloadBanner.classList.remove('is-showing');
     void reloadBanner.offsetWidth;
@@ -1375,7 +1375,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
     renderAll();
     try {
       const result = await api.submitAction({ uid, code, action: { type: 'chooseTarget', target: aimed } });
-      if (!destroyed && !result.ok) showError(TEXT.shotRefused);
+      if (!destroyed && !result.ok) showError(t('table.shotRefused'));
     } catch (error) {
       report(error);
     } finally {
@@ -1402,7 +1402,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
   function renderEnd() {
     if (!applied || !showingEnd) return;
     const { view } = applied;
-    endTopLeft.textContent = TEXT.endTop(code, MODE_LABELS[mode] ?? '', applied.n);
+    endTopLeft.textContent = t('end.endTop', code, modeLabel(mode), applied.n);
     const head = endHeadline(view, nameOf, outs);
     endTitle.textContent = head.title;
     endLine.textContent = head.line;
@@ -1410,18 +1410,18 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
     endSub.hidden = !head.sub;
     const rows = endRanking(summary(), { mySeat, nameOf, session, events });
     endList.replaceChildren(...rows.map((row) => h('li', { class: row.me ? 'end-row is-me' : 'end-row' },
-      h('span', { class: 'end-place', text: `${row.place}.` }),
+      h('span', { class: 'end-place', text: t('end.place', row.place) }),
       h('span', { class: 'end-who' },
         h('span', { class: 'end-name-line' },
           h('span', { class: 'end-name', text: row.name }),
-          row.me ? h('span', { class: 'end-me', text: TEXT.me }) : null),
+          row.me ? h('span', { class: 'end-me', text: t('tablo.me') }) : null),
         h('span', { class: 'end-status', text: row.status })),
       h('span', { class: 'end-points' },
         h('span', { class: row.points > 0 ? 'end-gain is-plus' : 'end-gain', text: formatSigned(row.points) }),
         row.total ? h('span', { class: 'end-total', text: row.total }) : null))));
     // "Salona dön" once the result is stored (the room is back in the lobby).
     backButton.disabled = !inLobby;
-    backNote.textContent = inLobby ? '' : TEXT.resultsSaving;
+    backNote.textContent = inLobby ? '' : t('end.resultsSaving');
   }
 
   // --- Public ----------------------------------------------------------------------------------

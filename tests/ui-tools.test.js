@@ -11,12 +11,15 @@ import {
   FRAME_TURQUOISE,
   ICON_SIZES,
   TOOL_DRAWINGS,
-  TOOL_NAMES,
   frameColor,
   isTool,
   toolIconTree,
   toolName,
 } from '../src/ui/tools.js';
+import tr from '../src/ui/i18n/tr.js';
+
+// The approved names are locale entries keyed by tool id (src/ui/i18n/tr.js).
+const TOOL_NAMES = tr.tools.names;
 
 const APPROVED = {
   detector: 'Göz',

@@ -4,22 +4,31 @@
 
 import { CONFIG_LIMITS, MIN_PLAYERS, TOOL_IDS, defaultConfig, toolsForMode, validateConfig } from '../engine/index.js';
 import { isSeatPresent, orderSeats, othersAbsent } from '../rooms/index.js';
-import { TEXT } from './messages.js';
+import { t } from './i18n/i18n.js';
 import { toolName } from './tools.js';
+
+// One stepped setting: its labels are read from the locale whenever they are shown (getters),
+// so they follow the current language.
+function steppedSetting(key, step, { label, summaryLabel = label, format = String, summary = format }) {
+  return Object.freeze({
+    key,
+    step,
+    get label() { return t(label); },
+    get summaryLabel() { return t(summaryLabel); },
+    format,
+    summary,
+  });
+}
+
+const seconds = (n) => t('settings.seconds', n);
 
 /** The general settings with − / + buttons, in the order of the design. */
 export const STEPPED_SETTINGS = Object.freeze([
-  { key: 'hp', label: 'Can (çay bardağı)', summaryLabel: 'Can', step: 1, format: (n) => String(n), summary: (n) => `${n} çay bardağı` },
-  { key: 'toolsPerReload', label: 'Her turda malzeme', summaryLabel: 'Her turda malzeme', step: 1, format: (n) => String(n), summary: (n) => String(n) },
-  { key: 'toolsPerTurn', label: 'Bir sırada en fazla malzeme', summaryLabel: 'Bir sırada en fazla malzeme', step: 1, format: (n) => String(n), summary: (n) => String(n) },
-  { key: 'shotTimeSeconds', label: 'Ateş süresi', summaryLabel: 'Ateş süresi', step: 5, format: (n) => `${n} sn`, summary: (n) => `${n} sn` },
+  steppedSetting('hp', 1, { label: 'settings.hp', summaryLabel: 'settings.hpShort', summary: (n) => t('settings.hpValue', n) }),
+  steppedSetting('toolsPerReload', 1, { label: 'settings.toolsPerReload' }),
+  steppedSetting('toolsPerTurn', 1, { label: 'settings.toolsPerTurn' }),
+  steppedSetting('shotTimeSeconds', 5, { label: 'settings.shotTime', format: seconds, summary: seconds }),
 ]);
-
-export const MODE_LABELS = Object.freeze({ classic: 'Klasik', custom: 'Özel' });
-export const MODE_HINTS = Object.freeze({
-  classic: 'Klasik: malzemeler her turun başında rastgele dağıtılır.',
-  custom: 'Özel: malzemeler dükkândan altınla alınır.',
-});
 
 const hasOwn = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
 const isToolId = (tool) => typeof tool === 'string' && TOOL_IDS.includes(tool);
@@ -84,7 +93,7 @@ export function toggleTool(config, tool) {
   const set = new Set(config.enabledTools);
   if (on) set.delete(tool);
   else set.add(tool);
-  return { ...config, enabledTools: TOOL_IDS.filter((t) => set.has(t)) };
+  return { ...config, enabledTools: TOOL_IDS.filter((id) => set.has(id)) };
 }
 
 export function canToggleTool(config, tool) {
@@ -102,7 +111,7 @@ export function defaultsFor(config) {
 }
 
 export function formatPoints(points) {
-  return `${Number.isFinite(points) ? points : 0} puan`;
+  return t('lobby.points', Number.isFinite(points) ? points : 0);
 }
 
 /**
@@ -121,10 +130,10 @@ export function playerRows({ seats, presence, scores, hostSeat, mySeat, seatOrde
       const present = isSeatPresent(presence?.[seatId]);
       const waiting = seat.waiting === true;
       const tags = [];
-      if (me) tags.push('sen');
-      if (host) tags.push('masa sahibi');
-      if (!present) tags.push('bağlantı yok');
-      if (waiting) tags.push('sonraki maçta oynar');
+      if (me) tags.push(t('lobby.tagMe'));
+      if (host) tags.push(t('lobby.tagHost'));
+      if (!present) tags.push(t('lobby.tagAbsent'));
+      if (waiting) tags.push(t('lobby.tagWaiting'));
       return {
         seatId,
         name: seat.name,
@@ -184,5 +193,5 @@ export function closeRoomState({ mySeat, hostSeat, status, seats, presence }) {
   if (typeof mySeat !== 'string' || mySeat !== hostSeat) return { visible: false, enabled: false, hint: null };
   if (status !== 'playing') return { visible: true, enabled: true, hint: null };
   const free = othersAbsent(seats, presence, mySeat);
-  return { visible: true, enabled: free, hint: free ? TEXT.closeRoomAllAbsent : TEXT.closeRoomLocked };
+  return { visible: true, enabled: free, hint: free ? t('closeRoom.closeRoomAllAbsent') : t('closeRoom.closeRoomLocked') };
 }

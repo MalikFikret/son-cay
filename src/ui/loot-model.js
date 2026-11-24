@@ -7,7 +7,7 @@
 // choice leaves the device only inside the lootChoice action.
 
 import { LOOT_SECONDS } from '../engine/index.js';
-import { TEXT } from './messages.js';
+import { t } from './i18n/i18n.js';
 import { isTool, toolName } from './tools.js';
 
 /**
@@ -63,13 +63,13 @@ export function lootAction(card, index) {
 /** The texts of a card (names are never put inside a Turkish word). */
 export function lootTexts(card, nameOf) {
   return {
-    title: TEXT.lootTitle(nameOf(card.victim)),
-    sub: card.empty ? TEXT.lootOnlyYou : TEXT.lootOnlyYouPick,
-    button: card.empty ? TEXT.lootOk : TEXT.lootTake,
+    title: t('loot.lootTitle', nameOf(card.victim)),
+    sub: card.empty ? t('loot.lootOnlyYou') : t('loot.lootOnlyYouPick'),
+    button: card.empty ? t('loot.lootOk') : t('loot.lootTake'),
   };
 }
 
 /** A refusal of a loot choice as one Turkish line (never a raw code). */
 export function lootErrorText(error) {
-  return error?.code === 'NO_LOOT' ? TEXT.lootGone : TEXT.lootRefused;
+  return error?.code === 'NO_LOOT' ? t('loot.lootGone') : t('loot.lootRefused');
 }

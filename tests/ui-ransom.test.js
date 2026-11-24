@@ -6,7 +6,7 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { applyAction, eventsFor, listLegalActions, viewFor } from '../src/engine/index.js';
-import { TEXT } from '../src/ui/messages.js';
+import { t } from '../src/ui/i18n/i18n.js';
 import {
   acceptAction,
   incomingCards,
@@ -136,8 +136,8 @@ describe('the recipient\'s Fidye card', () => {
     const res = applyAction(s, { type: 'ransomAccept', playerId: 'p3', from: 'p2' });
     assert.equal(res.ok, false);
     assert.equal(ransomErrorText(res.error), 'Teklif edilen malzeme artık yok.');
-    assert.equal(ransomErrorText({ code: 'NO_OFFER' }), TEXT.ransomGone);
-    assert.equal(ransomErrorText({ code: 'X' }), TEXT.ransomRefused);
+    assert.equal(ransomErrorText({ code: 'NO_OFFER' }), t('ransom.ransomGone'));
+    assert.equal(ransomErrorText({ code: 'X' }), t('ransom.ransomRefused'));
   });
 });
 

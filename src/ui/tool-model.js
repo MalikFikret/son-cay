@@ -9,7 +9,7 @@
 // device only inside the tool action itself, like the shot.
 
 import { TOOL_INFO } from '../engine/index.js';
-import { TEXT } from './messages.js';
+import { t } from './i18n/i18n.js';
 import { isTool, toolName } from './tools.js';
 
 const isAnytime = (tool) => TOOL_INFO[tool]?.timing === 'anytime';
@@ -38,10 +38,10 @@ export function handState(view) {
   const hand = Array.isArray(view.self.hand) ? view.self.hand.filter(isTool) : [];
   const mine = isMyTurn(view);
   const used = mine && Number.isInteger(view.self.toolsUsedThisTurn)
-    ? TEXT.usedThisTurn(view.self.toolsUsedThisTurn, view.config.toolsPerTurn)
+    ? t('tableTools.usedThisTurn', view.self.toolsUsedThisTurn, view.config.toolsPerTurn)
     : null;
   return {
-    title: hand.length > 0 ? TEXT.handTitle(hand.length) : TEXT.handEmpty,
+    title: hand.length > 0 ? t('table.handTitle', hand.length) : t('table.handEmpty'),
     used,
     tools: hand.map((tool, index) => ({
       tool,
@@ -70,27 +70,27 @@ export function toolActions(legalActions, tool) {
  */
 export function cardButton({ view, legalActions, tool }) {
   const used = isMyTurn(view) && Number.isInteger(view.self.toolsUsedThisTurn)
-    ? TEXT.usedThisTurnLong(view.self.toolsUsedThisTurn, view.config.toolsPerTurn)
+    ? t('tableTools.usedThisTurnLong', view.self.toolsUsedThisTurn, view.config.toolsPerTurn)
     : null;
   const off = (label) => ({ enabled: false, label, used, warning: null });
-  if (!holdsHand(view) || !isTool(tool) || !view.self.hand.includes(tool)) return off(TEXT.toolUnavailable);
+  if (!holdsHand(view) || !isTool(tool) || !view.self.hand.includes(tool)) return off(t('tableTools.toolUnavailable'));
   if (toolActions(legalActions, tool).length > 0) {
     // Çal is spent on the look: with no other tool in the hand there is nothing to give back.
     const nothingToGive = tool === 'steal' && view.self.hand.length <= 1;
     return {
       enabled: true,
-      label: nothingToGive ? TEXT.useAnyway : TEXT.use,
+      label: nothingToGive ? t('tableTools.useAnyway') : t('tableTools.use'),
       used,
-      warning: nothingToGive ? TEXT.stealNothingToGive : null,
+      warning: nothingToGive ? t('tableTools.stealNothingToGive') : null,
     };
   }
   const mine = isMyTurn(view);
-  if (!isAnytime(tool) && !mine) return off(TEXT.waitYourTurn);
-  if (mine && view.self.toolsUsedThisTurn >= view.config.toolsPerTurn) return off(TEXT.turnLimitReached);
-  if (tool === 'heal' && view.players.find((p) => p.id === view.viewer)?.hp >= view.config.hp) return off(TEXT.hpFull);
-  if (tool === 'double' && view.doublePending) return off(TEXT.doubleAlready);
-  if (mine && view.phase.type !== 'turn') return off(TEXT.finishPending);
-  return off(TEXT.toolUnavailable);
+  if (!isAnytime(tool) && !mine) return off(t('tableTools.waitYourTurn'));
+  if (mine && view.self.toolsUsedThisTurn >= view.config.toolsPerTurn) return off(t('tableTools.turnLimitReached'));
+  if (tool === 'heal' && view.players.find((p) => p.id === view.viewer)?.hp >= view.config.hp) return off(t('tableTools.hpFull'));
+  if (tool === 'double' && view.doublePending) return off(t('tableTools.doubleAlready'));
+  if (mine && view.phase.type !== 'turn') return off(t('tableTools.finishPending'));
+  return off(t('tableTools.toolUnavailable'));
 }
 
 // --- Targets ---------------------------------------------------------------------------------------
@@ -150,11 +150,11 @@ export function toolAction(tool, picks = []) {
  * "Hapis · bir oyuncu seç" -> "Hapis · Kerem"; Zincir "Zincir · Zeynep ve Yusuf".
  */
 export function pickBar({ tool, picks, need, nameOf, mySeat }) {
-  const who = (id) => (id === mySeat ? TEXT.yourself : nameOf(id));
+  const who = (id) => (id === mySeat ? t('tableTools.yourself') : nameOf(id));
   let sub;
-  if (picks.length >= need) sub = picks.map(who).join(TEXT.and);
-  else if (need === 2) sub = picks.length === 0 ? TEXT.pickTwo : TEXT.pickSecond(who(picks[0]));
-  else sub = tool === 'handSwap' ? TEXT.pickSwap : TEXT.pickOne;
+  if (picks.length >= need) sub = t('common.andList', picks.map(who));
+  else if (need === 2) sub = picks.length === 0 ? t('tableTools.pickTwo') : t('tableTools.pickSecond', who(picks[0]));
+  else sub = tool === 'handSwap' ? t('tableTools.pickSwap') : t('tableTools.pickOne');
   return { title: toolName(tool), sub, ready: picks.length >= need };
 }
 
@@ -259,26 +259,26 @@ export function detectionResults(events, viewerId) {
   return results;
 }
 
-const effectWord = (chamber) => (chamber === 'live' ? TEXT.live : TEXT.blank);
+const effectWord = (chamber) => (chamber === 'live' ? t('tableTools.live') : t('tableTools.blank'));
 
 /** The text of one strip item, expanded: { name, text, strong, after }. */
 export function resultText(item) {
   const name = toolName(item.tool);
   switch (item.tool) {
     case 'detector':
-      return { name, text: TEXT.detectorResult, strong: effectWord(item.chamber), after: '' };
+      return { name, text: t('tableTools.detectorResult'), strong: effectWord(item.chamber), after: '' };
     case 'skip':
-      return { name, text: TEXT.skipResult, strong: effectWord(item.chamber), after: '' };
+      return { name, text: t('tableTools.skipResult'), strong: effectWord(item.chamber), after: '' };
     case 'probe':
-      if (item.result === 'noNext') return { name, text: TEXT.probeLast, strong: '', after: '' };
-      return { name, text: TEXT.probeResult, strong: item.result === 'same' ? TEXT.same : TEXT.different, after: '' };
+      if (item.result === 'noNext') return { name, text: t('tableTools.probeLast'), strong: '', after: '' };
+      return { name, text: t('tableTools.probeResult'), strong: item.result === 'same' ? t('tableTools.same') : t('tableTools.different'), after: '' };
     case 'counter':
-      return { name, text: TEXT.counterResult(item.examined), strong: TEXT.liveCount(item.live), after: '' };
+      return { name, text: t('tableTools.counterResult', item.examined), strong: t('tableTools.liveCount', item.live), after: '' };
     case 'flip':
-      return { name, text: TEXT.flipResult, strong: item.flipped ? TEXT.flipped : TEXT.notFlipped, after: '' };
+      return { name, text: t('tableTools.flipResult'), strong: item.flipped ? t('tableTools.flipped') : t('tableTools.notFlipped'), after: '' };
     case 'shotShield':
     case 'toolShield':
-      return { name, text: ' · ', strong: '', after: item.active ? TEXT.shieldActive(item.count) : TEXT.shieldWaiting(item.count) };
+      return { name, text: ' · ', strong: '', after: item.active ? t('tableTools.shieldActive', item.count) : t('tableTools.shieldWaiting', item.count) };
     default:
       return { name, text: '', strong: '', after: '' };
   }
@@ -326,13 +326,13 @@ export function chainPartners(links, seatId) {
 export function toolTagsOf(player, links) {
   const tags = [];
   if (!player?.alive) return tags;
-  if (player.jailed) tags.push(TEXT.tagJailed);
-  if (chainPartners(links, player.id).length > 0) tags.push(TEXT.tagChained);
+  if (player.jailed) tags.push(t('tableTools.tagJailed'));
+  if (chainPartners(links, player.id).length > 0) tags.push(t('tableTools.tagChained'));
   return tags;
 }
 
 /** "×2" on the revolver while the next shot is doubled (public view.doublePending). */
-export const doubleMark = (view) => (view?.status === 'active' && view.doublePending === true ? TEXT.doubleMark : null);
+export const doubleMark = (view) => (view?.status === 'active' && view.doublePending === true ? t('tableTools.doubleMark') : null);
 
 // --- Refusals -------------------------------------------------------------------------------------
 
@@ -340,16 +340,16 @@ export const doubleMark = (view) => (view?.status === 'active' && view.doublePen
 export function toolErrorText(error) {
   switch (error?.code) {
     case 'TOOL_LIMIT_REACHED':
-      return TEXT.turnLimitReached;
+      return t('tableTools.turnLimitReached');
     case 'NOT_YOUR_TURN':
-      return TEXT.waitYourTurn;
+      return t('tableTools.waitYourTurn');
     case 'HP_FULL':
-      return TEXT.hpFull;
+      return t('tableTools.hpFull');
     case 'DOUBLE_ALREADY_ACTIVE':
-      return TEXT.doubleAlready;
+      return t('tableTools.doubleAlready');
     case 'WRONG_PHASE':
-      return TEXT.finishPending;
+      return t('tableTools.finishPending');
     default:
-      return TEXT.toolRefused;
+      return t('tableTools.toolRefused');
   }
 }

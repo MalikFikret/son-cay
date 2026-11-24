@@ -17,12 +17,11 @@
 // the table is closed, every other device shows "Masa kapatıldı" and then Giriş.
 
 import { h } from '../dom.js';
-import { copyText, errorLine, icon, screen } from '../components.js';
-import { FORM_MESSAGES, TEXT, errorMessage } from '../messages.js';
+import { copyText, errorLine, icon, modeHint, modeLabel, screen } from '../components.js';
+import { errorMessage } from '../messages.js';
+import { t } from '../i18n/i18n.js';
 import { hashFor, inviteLink } from '../routes.js';
 import {
-  MODE_HINTS,
-  MODE_LABELS,
   STEPPED_SETTINGS,
   canStep,
   canToggleTool,
@@ -68,33 +67,33 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
   let ended = false;
 
   // --- Static parts --------------------------------------------------------------------------
-  const subtitle = h('span', { class: 'header-sub', text: 'Bekleme salonu' });
-  const leaveButton = h('button', { type: 'button', class: 'btn-small', text: 'Çık', on: { click: askToLeave } });
-  const tabloButton = h('button', { type: 'button', class: 'btn-small btn-small-accent', on: { click: () => tablo.open() } }, icon('table'), TEXT.tablo);
+  const subtitle = h('span', { class: 'header-sub', text: t('lobby.subtitle') });
+  const leaveButton = h('button', { type: 'button', class: 'btn-small', text: t('lobby.leave'), on: { click: askToLeave } });
+  const tabloButton = h('button', { type: 'button', class: 'btn-small btn-small-accent', on: { click: () => tablo.open() } }, icon('table'), t('tablo.tablo'));
   const topBar = h('header', { class: 'lobby-top' },
     h('div', { class: 'header-text' },
-      h('h1', { class: 'lobby-title', text: 'Son Çay' }),
+      h('h1', { class: 'lobby-title', text: t('app.name') }),
       subtitle),
     h('div', { class: 'lobby-top-actions' },
       tabloButton,
       leaveButton));
 
   const copyStatus = h('p', { class: 'field-error status-line', role: 'status', hidden: true });
-  const copyButton = h('button', { type: 'button', class: 'btn-invite', on: { click: copyInvite } }, icon('link'), 'Davet bağlantısı');
+  const copyButton = h('button', { type: 'button', class: 'btn-invite', on: { click: copyInvite } }, icon('link'), t('lobby.invite'));
   const codeCard = h('div', { class: 'field' },
     h('div', { class: 'code-card' },
       h('span', { class: 'code-card-text' },
-        h('span', { class: 'hint', text: 'Masa kodu' }),
+        h('span', { class: 'hint', text: t('common.tableCodeLabel') }),
         h('span', { class: 'code-card-code', text: code })),
       copyButton),
     copyStatus);
 
   const playersList = h('ul', { class: 'player-list', 'aria-labelledby': 'players-title' });
-  const seatOrderNote = h('span', { class: 'hint', text: TEXT.seatOrderRandom });
-  const seatOrderButton = h('button', { type: 'button', class: 'link-button', text: TEXT.editSeatOrder, hidden: true, on: { click: () => seatOrderSheet.open(currentRows) } });
+  const seatOrderNote = h('span', { class: 'hint', text: t('seatOrder.seatOrderRandom') });
+  const seatOrderButton = h('button', { type: 'button', class: 'link-button', text: t('seatOrder.editSeatOrder'), hidden: true, on: { click: () => seatOrderSheet.open(currentRows) } });
   const playersSection = h('section', { class: 'lobby-section' },
     h('div', { class: 'section-head' },
-      h('h2', { class: 'section-title', id: 'players-title', text: 'Oyuncular' }),
+      h('h2', { class: 'section-title', id: 'players-title', text: t('lobby.players') }),
       seatOrderNote),
     playersList,
     seatOrderButton);
@@ -102,7 +101,7 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
   const settingsBody = h('div', { class: 'lobby-settings' });
   const settingsError = errorLine('settings-error');
   const settingsSection = h('section', { class: 'lobby-section', 'aria-labelledby': 'settings-title' },
-    h('h2', { class: 'section-title', id: 'settings-title', text: 'Oyun ayarları' }),
+    h('h2', { class: 'section-title', id: 'settings-title', text: t('lobby.settingsTitle') }),
     settingsBody,
     settingsError.el);
 
@@ -111,7 +110,7 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
   const pageError = errorLine('lobby-error');
   if (message) pageError.show(message);
 
-  const loadingLine = h('p', { class: 'loading', role: 'status', text: 'Yükleniyor…' });
+  const loadingLine = h('p', { class: 'loading', role: 'status', text: t('common.loading') });
   const body = h('div', { class: 'stack lobby-body', hidden: true },
     pageError.el, codeCard, playersSection, settingsSection, closeControl.el);
   const bottom = h('div', { class: 'lobby-bottom' });
@@ -216,8 +215,8 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
       seatOrder: next.seatOrder,
     });
     currentRows = rows;
-    subtitle.textContent = `Bekleme salonu · ${rows.length} oyuncu`;
-    seatOrderNote.textContent = next.seatOrder ? TEXT.seatOrderManual : TEXT.seatOrderRandom;
+    subtitle.textContent = t('lobby.subtitleCount', rows.length);
+    seatOrderNote.textContent = next.seatOrder ? t('seatOrder.seatOrderManual') : t('seatOrder.seatOrderRandom');
     const host = next.meta.hostSeat === mySeat;
     const inLobby = next.meta.status === 'lobby';
     optionsSheet.sync(rows, optionsOf);
@@ -231,7 +230,7 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
     // During a match the Tablo belongs to the table screen (a later step).
     tabloButton.disabled = playing;
     if (playing) tablo.close();
-    leaveButton.title = playing ? 'Maç sırasında masadan çıkılamaz' : '';
+    leaveButton.title = playing ? t('lobby.leaveLocked') : '';
     // A new match started while this player was still on the last one's end screen.
     if (playing && table && tableSawLobby) closeTable();
     if (playing && !table) openTable(next);
@@ -272,7 +271,7 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
     const options = optionsOf(row);
     if (options.length === 0) return null;
     return h('button', {
-      type: 'button', class: 'icon-button', 'aria-label': TEXT.optionsFor(row.name),
+      type: 'button', class: 'icon-button', 'aria-label': t('players.optionsFor', row.name),
       on: { click: () => optionsSheet.open(row, options) },
     }, icon('dots'));
   }
@@ -290,7 +289,7 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
         sync = createSettingsSync({
           write: (settings) => ctx.api.updateSettings({ uid: ctx.uid, code, settings }),
           onShow: showHostSettings,
-          onError: () => settingsError.show(FORM_MESSAGES.SETTINGS_FAILED),
+          onError: () => settingsError.show(errorMessage('SETTINGS_FAILED')),
         });
       } else {
         if (sync) sync.dispose();
@@ -306,30 +305,30 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
   function renderBottom(host, hostName) {
     if (host) {
       const { canStart } = startCheck(currentRows);
-      const button = h('button', { type: 'button', class: 'btn-start', text: starting ? TEXT.starting : TEXT.startMatch, disabled: !canStart || starting, 'aria-describedby': 'start-note' });
+      const button = h('button', { type: 'button', class: 'btn-start', text: starting ? t('start.starting') : t('start.startMatch'), disabled: !canStart || starting, 'aria-describedby': 'start-note' });
       button.addEventListener('click', () => startMatch(button));
-      bottom.replaceChildren(button, h('span', { class: 'hint center', id: 'start-note', text: canStart ? TEXT.startNote : TEXT.startTooFew }));
+      bottom.replaceChildren(button, h('span', { class: 'hint center', id: 'start-note', text: canStart ? t('start.startNote') : t('start.startTooFew') }));
     } else {
       bottom.replaceChildren(h('div', { class: 'waiting-line', role: 'status' },
         icon('clock'),
-        h('span', { text: hostName ? `${hostName} maçı başlatınca masa açılır` : 'Masa sahibi maçı başlatınca masa açılır' })));
+        h('span', { text: t('lobby.waitingForHost', hostName) })));
     }
   }
 
   function buildHostControls() {
     const modeHint = h('span', { class: 'hint' });
-    const modeGroup = h('div', { class: 'segmented', role: 'radiogroup', 'aria-label': 'Oyun türü' },
+    const modeGroup = h('div', { class: 'segmented', role: 'radiogroup', 'aria-label': t('lobby.modeGroup') },
       ['classic', 'custom'].map((mode) => {
         const input = h('input', { type: 'radio', name: 'lobby-mode', value: mode, class: 'visually-hidden', disabled: mode !== 'classic' });
-        return h('label', { class: mode === 'classic' ? 'segment' : 'segment is-disabled', title: mode === 'classic' ? null : 'Yakında' },
-          input, MODE_LABELS[mode]);
+        return h('label', { class: mode === 'classic' ? 'segment' : 'segment is-disabled', title: mode === 'classic' ? null : t('common.soon') },
+          input, modeLabel(mode));
       }));
 
     const rows = STEPPED_SETTINGS.map((setting) => {
       const labelId = `set-${setting.key}`;
       const output = h('output', { class: 'stepper-value', 'aria-labelledby': labelId });
-      const minus = h('button', { type: 'button', class: 'stepper-button', 'aria-label': `${setting.label}: azalt` }, icon('minus'));
-      const plus = h('button', { type: 'button', class: 'stepper-button', 'aria-label': `${setting.label}: artır` }, icon('plus'));
+      const minus = h('button', { type: 'button', class: 'stepper-button', 'aria-label': t('lobby.decrease', setting.label) }, icon('minus'));
+      const plus = h('button', { type: 'button', class: 'stepper-button', 'aria-label': t('lobby.increase', setting.label) }, icon('plus'));
       minus.addEventListener('click', () => change((c) => stepSetting(c, setting.key, -1)));
       plus.addEventListener('click', () => change((c) => stepSetting(c, setting.key, +1)));
       const el = h('div', { class: 'stepper-row' },
@@ -339,7 +338,7 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
 
     const toolCount = h('span', { class: 'tool-count' });
     const toolToggle = h('button', { type: 'button', class: 'tools-toggle', 'aria-expanded': 'false', 'aria-controls': 'tool-list' },
-      h('span', { class: 'stepper-label', text: 'Oyundaki malzemeler' }), toolCount, icon('chevron'));
+      h('span', { class: 'stepper-label', text: t('lobby.toolsTitle') }), toolCount, icon('chevron'));
     const toolBox = h('ul', { class: 'tool-list', id: 'tool-list', hidden: true });
     toolToggle.addEventListener('click', () => {
       const open = toolBox.hidden;
@@ -351,7 +350,7 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
     rows.forEach((row) => card.append(row.el, h('span', { class: 'separator', 'aria-hidden': 'true' })));
     card.append(toolToggle, toolBox);
 
-    const reset = h('button', { type: 'button', class: 'link-button', text: 'Varsayılanlara dön', on: { click: () => change((c) => defaultsFor(c)) } });
+    const reset = h('button', { type: 'button', class: 'link-button', text: t('lobby.reset'), on: { click: () => change((c) => defaultsFor(c)) } });
 
     return {
       el: h('div', { class: 'lobby-settings' }, modeGroup, modeHint, card, reset),
@@ -376,14 +375,14 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
     for (const label of hostUi.modeGroup.querySelectorAll('label')) {
       label.classList.toggle('is-checked', label.querySelector('input').checked);
     }
-    hostUi.modeHint.textContent = MODE_HINTS[settings.mode] ?? '';
+    hostUi.modeHint.textContent = modeHint(settings.mode);
     for (const row of hostUi.rows) {
       row.output.textContent = row.setting.format(settings[row.setting.key]);
       row.minus.disabled = !canStep(settings, row.setting.key, -1);
       row.plus.disabled = !canStep(settings, row.setting.key, +1);
     }
     const { enabled, total } = toolCounter(settings);
-    hostUi.toolCount.textContent = `${enabled} / ${total}`;
+    hostUi.toolCount.textContent = t('lobby.toolCount', enabled, total);
     // Keep the focused checkbox in place: update the states instead of redrawing the list.
     if (hostUi.toolBox.childElementCount === 0) {
       hostUi.toolBox.append(...toolList(settings).map(({ tool, name }) => {
@@ -405,20 +404,20 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
   function renderSummary(settings) {
     const { enabled, total } = toolCounter(settings);
     const items = [
-      ['Tür', MODE_LABELS[settings.mode] ?? ''],
+      [t('lobby.summaryMode'), modeLabel(settings.mode)],
       ...STEPPED_SETTINGS.map((s) => [s.summaryLabel, s.summary(settings[s.key])]),
     ];
     const list = h('ul', { class: 'tool-list', id: 'player-tool-list', hidden: !playerToolsOpen },
       toolList(settings).map(({ tool, name, enabled: on }) => h('li', { class: on ? 'tool-item' : 'tool-item is-off' },
         toolIcon(tool, 'small'),
         h('span', { class: 'tool-name', text: name }),
-        on ? null : h('span', { class: 'visually-hidden', text: ' (kapalı)' }))));
+        on ? null : h('span', { class: 'visually-hidden', text: t('lobby.toolOff') }))));
     const toggle = h('button', {
       type: 'button', class: 'tools-toggle summary-tools-toggle',
       'aria-expanded': String(playerToolsOpen), 'aria-controls': 'player-tool-list',
     },
-    h('span', { class: 'stepper-label', text: 'Oyundaki malzemeler' }),
-    h('span', { class: 'tool-count', text: `${enabled} / ${total}` }),
+    h('span', { class: 'stepper-label', text: t('lobby.toolsTitle') }),
+    h('span', { class: 'tool-count', text: t('lobby.toolCount', enabled, total) }),
     icon('chevron'));
     toggle.addEventListener('click', () => {
       playerToolsOpen = !playerToolsOpen;
@@ -444,7 +443,7 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
     }
     starting = true;
     button.disabled = true;
-    button.textContent = TEXT.starting;
+    button.textContent = t('start.starting');
     pageError.clear();
     try {
       await ctx.api.startMatch({ uid: ctx.uid, code });
@@ -481,7 +480,7 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
     tableSawLobby = false;
     lobbyPart.hidden = true;
     root.append(table.el);
-    document.title = 'Son Çay: masa';
+    document.title = t('app.pageTitle', t('app.titleTable'));
     window.scrollTo(0, 0);
   }
 
@@ -492,7 +491,7 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
     table = null;
     tableSawLobby = false;
     lobbyPart.hidden = false;
-    if (view.active()) document.title = 'Son Çay: bekleme salonu';
+    if (view.active()) document.title = t('app.pageTitle', t('app.titleLobby'));
   }
 
   // "Salona dön" on the end screen (enabled once the room is back in the lobby).
@@ -510,7 +509,7 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
     const copied = await copyText(link);
     if (!view.active()) return;
     copyStatus.classList.toggle('is-error', !copied);
-    copyStatus.textContent = copied ? 'Bağlantı kopyalandı.' : `${FORM_MESSAGES.COPY_FAILED} ${link}`;
+    copyStatus.textContent = copied ? t('lobby.copied') : t('lobby.copyFailed', link);
     copyStatus.hidden = false;
     clearTimeout(copyTimer);
     copyTimer = setTimeout(() => { copyStatus.hidden = true; }, copied ? 2500 : 15000);
@@ -520,10 +519,10 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
   function buildLeaveDialog() {
     const text = h('p', { class: 'muted' });
     const error = errorLine('leave-error');
-    const yes = h('button', { type: 'button', class: 'btn btn-primary', text: 'Evet, çık' });
-    const no = h('button', { type: 'button', class: 'btn btn-outline', text: 'Vazgeç' });
+    const yes = h('button', { type: 'button', class: 'btn btn-primary', text: t('lobby.leaveYes') });
+    const no = h('button', { type: 'button', class: 'btn btn-outline', text: t('common.cancel') });
     const el = h('dialog', { class: 'dialog', 'aria-labelledby': 'leave-title' },
-      h('h2', { class: 'section-title', id: 'leave-title', text: 'Masadan çıkılsın mı?' }),
+      h('h2', { class: 'section-title', id: 'leave-title', text: t('lobby.leaveTitle') }),
       text, error.el, h('div', { class: 'dialog-actions' }, no, yes));
     no.addEventListener('click', () => el.close());
     yes.addEventListener('click', () => leave(yes));
@@ -531,9 +530,9 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
       el,
       open() {
         const others = lobby ? Object.keys(lobby.seats).filter((s) => s !== mySeat).length : 1;
-        const lines = ['Yerin boşalır; tekrar oturursan puanların sıfırdan başlar.'];
-        if (others === 0) lines.push('Masada başka kimse olmadığı için masa kapanır.');
-        else if (lobby?.meta.hostSeat === mySeat) lines.push('Masa sahipliği başka bir oyuncuya geçer.');
+        const lines = [t('lobby.leaveSeat')];
+        if (others === 0) lines.push(t('lobby.leaveCloses'));
+        else if (lobby?.meta.hostSeat === mySeat) lines.push(t('lobby.leaveHandsOver'));
         text.textContent = lines.join(' ');
         error.clear();
         if (typeof el.showModal === 'function') el.showModal();
@@ -601,7 +600,7 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
       stopAll();
       if (failure?.code === ROOM_ERR.ROOM_NOT_FOUND) {
         ctx.forgetTable();
-        ctx.goHome(TEXT.roomClosed, { info: true });
+        ctx.goHome(t('closeRoom.roomClosed'), { info: true });
         return null;
       }
       // Presence may already be stopped: draw the screen again, with the message.
@@ -612,7 +611,7 @@ export function lobbyScreen(ctx, view, { code, mine, message }) {
     ctx.keeper.release();
     stopAll();
     ctx.forgetTable();
-    if (view.active()) ctx.goHome(TEXT.roomClosedByMe, { info: true });
+    if (view.active()) ctx.goHome(t('closeRoom.roomClosedByMe'), { info: true });
     return null;
   }
 

@@ -8,7 +8,8 @@
 
 import { h, svg } from './dom.js';
 import { ICONS, icon, loading as loadingLine } from './components.js';
-import { TEXT, errorMessage } from './messages.js';
+import { errorMessage } from './messages.js';
+import { t } from './i18n/i18n.js';
 import { createSheet } from './sheet.js';
 import { matchView, sessionView } from './tablo-model.js';
 
@@ -18,7 +19,7 @@ import { matchView, sessionView } from './tablo-model.js';
  * @returns {{ open(tab?): void, close(): void, update(session, names): void, destroy(): void }}
  */
 export function createTablo({ loadLastMatch, mySeat }) {
-  const sheet = createSheet({ title: TEXT.tablo, tall: true, className: 'tablo' });
+  const sheet = createSheet({ title: t('tablo.tablo'), tall: true, className: 'tablo' });
   let tab = 'match';
   let session = { matches: 0, rows: [] };
   let names = {};
@@ -28,16 +29,16 @@ export function createTablo({ loadLastMatch, mySeat }) {
   let live = null; // () => live "Bu maç" view (the table screen), or null
   const expanded = new Set();
 
-  const tabs = { match: tabButton('match', TEXT.tabMatch), session: tabButton('session', TEXT.tabSession) };
-  const tabList = h('div', { class: 'segmented tablo-tabs', role: 'tablist', 'aria-label': TEXT.tablo }, tabs.match, tabs.session);
+  const tabs = { match: tabButton('match', t('tablo.tabMatch')), session: tabButton('session', t('tablo.tabSession')) };
+  const tabList = h('div', { class: 'segmented tablo-tabs', role: 'tablist', 'aria-label': t('tablo.tablo') }, tabs.match, tabs.session);
   const headerLine = h('span', { class: 'hint tablo-header-line' });
   const panel = h('div', { class: 'tablo-panel', role: 'tabpanel' });
   // The red "Sıra sende" bar (the one red exception: it stands in for the fire button).
   const turnSeconds = h('span', { class: 'turn-bar-seconds' });
   const turnBar = h('button', { type: 'button', class: 'turn-bar', hidden: true },
-    h('span', { class: 'turn-bar-title', text: TEXT.yourTurn }),
+    h('span', { class: 'turn-bar-title', text: t('table.yourTurn') }),
     turnSeconds,
-    h('span', { class: 'turn-bar-back', text: TEXT.backToTable }),
+    h('span', { class: 'turn-bar-back', text: t('liveTablo.backToTable') }),
     icon('chevron'));
   turnBar.addEventListener('click', () => sheet.close());
   sheet.head.prepend(turnBar);
@@ -100,9 +101,9 @@ export function createTablo({ loadLastMatch, mySeat }) {
         return;
       }
       panel.replaceChildren(
-        columns(TEXT.colRank, TEXT.colPlayer, TEXT.colRounds, TEXT.colPoints, ''),
+        columns(t('tablo.colRank'), t('tablo.colPlayer'), t('tablo.colRounds'), t('tablo.colPoints'), ''),
         h('ul', { class: 'tablo-list' }, view.rows.map(matchRow)),
-        h('p', { class: 'hint tablo-note', text: view.footnote ?? TEXT.matchFootnote }));
+        h('p', { class: 'hint tablo-note', text: view.footnote ?? t('tablo.matchFootnote') }));
       return;
     }
     if (summary === undefined || loading) {
@@ -118,14 +119,14 @@ export function createTablo({ loadLastMatch, mySeat }) {
     const view = matchView(summary, mySeat);
     if (!view) {
       headerLine.textContent = '';
-      panel.replaceChildren(h('p', { class: 'tablo-empty', text: TEXT.noMatchYet }));
+      panel.replaceChildren(h('p', { class: 'tablo-empty', text: t('tablo.noMatchYet') }));
       return;
     }
     headerLine.textContent = view.header;
     panel.replaceChildren(
-      columns(TEXT.colRank, TEXT.colPlayer, TEXT.colRounds, TEXT.colPoints, ''),
+      columns(t('tablo.colRank'), t('tablo.colPlayer'), t('tablo.colRounds'), t('tablo.colPoints'), ''),
       h('ul', { class: 'tablo-list' }, view.rows.map(matchRow)),
-      h('p', { class: 'hint tablo-note', text: TEXT.matchFootnote }));
+      h('p', { class: 'hint tablo-note', text: t('tablo.matchFootnote') }));
   }
 
   function matchRow(row) {
@@ -136,7 +137,7 @@ export function createTablo({ loadLastMatch, mySeat }) {
       h('span', { class: 'tablo-who' },
         h('span', { class: 'tablo-name-line' },
           h('span', { class: 'tablo-name', text: row.displayName }),
-          row.me ? h('span', { class: 'tablo-me', text: TEXT.me }) : null),
+          row.me ? h('span', { class: 'tablo-me', text: t('tablo.me') }) : null),
         h('span', { class: 'tablo-status-line' },
           row.glasses ? glasses(row.glasses) : null,
           row.statusText ? h('span', { class: row.status === 'won' ? 'tablo-status is-won' : 'tablo-status', text: row.statusText }) : null)),
@@ -164,7 +165,7 @@ export function createTablo({ loadLastMatch, mySeat }) {
   }
 
   function glasses({ full, total }) {
-    const el = h('span', { class: 'tablo-glasses', role: 'img', 'aria-label': TEXT.hpLabel(full) });
+    const el = h('span', { class: 'tablo-glasses', role: 'img', 'aria-label': t('tablo.hpLabel', full) });
     for (let i = 0; i < total; i += 1) el.append(svg(i < full ? ICONS.glassFull : ICONS.glassEmpty));
     return el;
   }
@@ -173,18 +174,18 @@ export function createTablo({ loadLastMatch, mySeat }) {
     const view = sessionView(session, names, mySeat);
     headerLine.textContent = view.header;
     panel.replaceChildren(
-      columns(TEXT.colRank, TEXT.colPlayer, TEXT.colMatches, TEXT.colWins, TEXT.colPoints),
+      columns(t('tablo.colRank'), t('tablo.colPlayer'), t('tablo.colMatches'), t('tablo.colWins'), t('tablo.colPoints')),
       h('ul', { class: 'tablo-list' }, view.rows.map((row) => h('li', { class: row.me ? 'tablo-item tablo-row cols-session is-me' : 'tablo-item tablo-row cols-session' },
         h('span', { class: 'tablo-rank', text: String(row.rank) }),
         h('span', { class: 'tablo-name-line' },
           h('span', { class: 'tablo-name', text: row.displayName }),
-          row.me ? h('span', { class: 'tablo-me', text: TEXT.me }) : null),
+          row.me ? h('span', { class: 'tablo-me', text: t('tablo.me') }) : null),
         h('span', { class: 'num', text: String(row.matches) }),
-        h('span', { class: 'num tablo-wins' }, String(row.wins), row.wins > 0 ? h('span', { role: 'img', 'aria-label': TEXT.winsLabel }, icon('crown')) : null),
+        h('span', { class: 'num tablo-wins' }, String(row.wins), row.wins > 0 ? h('span', { role: 'img', 'aria-label': t('tablo.winsLabel') }, icon('crown')) : null),
         h('span', { class: 'num tablo-total' },
           h('span', { class: 'tablo-points', text: String(row.points) }),
           row.lastText ? h('span', { class: 'tablo-last', text: row.lastText }) : null)))),
-      h('p', { class: 'hint tablo-note', text: TEXT.sessionFootnote }));
+      h('p', { class: 'hint tablo-note', text: t('tablo.sessionFootnote') }));
   }
 
   return {

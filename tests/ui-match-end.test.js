@@ -7,7 +7,7 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { applyAction, createMatch, eventsFor, listLegalActions, viewFor } from '../src/engine/index.js';
 import { summarizeMatch, summarizeView } from '../src/rooms/index.js';
-import { TEXT } from '../src/ui/messages.js';
+import { t } from '../src/ui/i18n/i18n.js';
 import { liveMatchView } from '../src/ui/tablo-model.js';
 import { canKick, endHeadline, endRanking, lastShotVictims, outRounds, targetsFrom, watchStrip } from '../src/ui/table-model.js';
 
@@ -129,19 +129,19 @@ describe('the end screen', () => {
     const loser = IDS.find((id) => id !== winner);
     const outs = outRounds(seen[loser]);
     const mine = endHeadline(viewFor(state, winner), nameOf, outRounds(seen[winner]));
-    assert.deepEqual(mine, { title: 'Kazandın', line: TEXT.endMine, sub: '' });
+    assert.deepEqual(mine, { title: 'Kazandın', line: t('end.endMine'), sub: '' });
     const theirs = endHeadline(viewFor(state, loser), nameOf, outs);
     assert.equal(theirs.title, `Kazanan: ${nameOf(winner)}`);
     assert.equal(theirs.line, `Sen ${outs[loser].round}. turda çıktın.`);
     assert.equal(theirs.sub, `Son çayı ${nameOf(winner)} içti.`);
     // A seat that joined during the match watched it.
-    assert.equal(endHeadline(viewFor(state, null), nameOf, {}).line, TEXT.endWatched);
+    assert.equal(endHeadline(viewFor(state, null), nameOf, {}).line, t('end.endWatched'));
     assert.equal(endHeadline({ ...viewFor(state, null), status: 'active' }, nameOf, {}), null);
   });
 
   test('a draw: "Berabere", "Kimse kazanmadı."', () => {
     const view = { status: 'ended', viewer: 's01', result: { type: 'draw', winner: null } };
-    assert.deepEqual(endHeadline(view, nameOf, {}), { title: 'Berabere', line: 'Kimse kazanmadı.', sub: TEXT.endDrawLine });
+    assert.deepEqual(endHeadline(view, nameOf, {}), { title: 'Berabere', line: 'Kimse kazanmadı.', sub: t('end.endDrawLine') });
   });
 
   test('a player removed by the host is told so', () => {

@@ -3,7 +3,8 @@
 
 import { h } from '../dom.js';
 import { errorLine, icon, markInvalid, screen, whileBusy } from '../components.js';
-import { FORM_MESSAGES, errorMessage } from '../messages.js';
+import { errorMessage } from '../messages.js';
+import { t } from '../i18n/i18n.js';
 import { codeFromText, hashFor } from '../routes.js';
 import { tableGuard } from '../home-model.js';
 import { createHomeBar } from '../home-bar.js';
@@ -20,11 +21,11 @@ export function homeScreen(ctx, view, { message, info = false } = {}) {
 
   const codeInput = h('input', {
     id: 'code', type: 'text', class: 'input input-code', maxlength: CODE_LENGTH, autocomplete: 'off',
-    autocapitalize: 'characters', spellcheck: 'false', placeholder: '4KX9QZ', 'aria-describedby': 'code-error',
+    autocapitalize: 'characters', spellcheck: 'false', placeholder: t('home.codePlaceholder'), 'aria-describedby': 'code-error',
     enterkeyhint: 'go',
   });
   const error = errorLine('code-error');
-  const join = h('button', { type: 'submit', class: 'btn btn-primary', text: 'Masaya katıl' });
+  const join = h('button', { type: 'submit', class: 'btn btn-primary', text: t('home.join') });
 
   // A pasted invite link becomes its code (the field only holds 6 characters).
   codeInput.addEventListener('paste', (event) => {
@@ -53,7 +54,7 @@ export function homeScreen(ctx, view, { message, info = false } = {}) {
     event.preventDefault();
     if (join.disabled) return;
     const typed = codeInput.value.trim();
-    if (typed === '') return showError(FORM_MESSAGES.CODE_EMPTY);
+    if (typed === '') return showError(errorMessage('CODE_EMPTY'));
     const code = codeFromText(typed);
     if (code === null) return showError(errorMessage('INVALID_CODE'));
     codeInput.value = code;
@@ -63,7 +64,7 @@ export function homeScreen(ctx, view, { message, info = false } = {}) {
     if (!guard.allowed) return showError(guard.message);
     try {
       // Check the table exists before leaving the screen, so a typo is shown right here.
-      await whileBusy(join, 'Bir saniye…', () => ctx.api.getRoomSummary({ uid: ctx.uid, code }));
+      await whileBusy(join, t('common.oneSecond'), () => ctx.api.getRoomSummary({ uid: ctx.uid, code }));
     } catch (failure) {
       if (view.active()) showError(errorMessage(failure));
       return;
@@ -93,27 +94,27 @@ export function homeScreen(ctx, view, { message, info = false } = {}) {
 
   const form = h('form', { class: 'home-actions', novalidate: true, on: { submit: onJoin } },
     h('div', { class: 'field' },
-      h('label', { class: 'label', for: 'code', text: 'Masa kodu' }),
+      h('label', { class: 'label', for: 'code', text: t('common.tableCodeLabel') }),
       codeInput,
       error.el,
       infoLine),
     join,
-    h('div', { class: 'divider' }, h('span', { class: 'rule' }), h('span', { text: 'ya da' }), h('span', { class: 'rule' })),
-    h('button', { type: 'button', class: 'btn btn-outline', text: 'Yeni masa kur', on: { click: onCreate } }),
+    h('div', { class: 'divider' }, h('span', { class: 'rule' }), h('span', { text: t('home.or') }), h('span', { class: 'rule' })),
+    h('button', { type: 'button', class: 'btn btn-outline', text: t('home.create'), on: { click: onCreate } }),
     h('div', { class: 'tile-row' },
-      h('button', { type: 'button', class: 'btn-tile', disabled: true, title: 'Yakında' }, icon('book'), 'Nasıl oynanır'),
-      h('button', { type: 'button', class: 'btn-tile', disabled: true, title: 'Yakında' }, icon('gear'), 'Ayarlar')),
-    h('p', { class: 'small-note', text: 'Hesap yok, kayıt yok. Davet bağlantısıyla geldiysen kod hazır.' }),
+      h('button', { type: 'button', class: 'btn-tile', disabled: true, title: t('common.soon') }, icon('book'), t('common.howToPlay')),
+      h('button', { type: 'button', class: 'btn-tile', disabled: true, title: t('common.soon') }, icon('gear'), t('common.settings'))),
+    h('p', { class: 'small-note', text: t('home.note') }),
     h('div', { class: 'footer' },
-      h('span', { text: '© 2026 Malik Fikret. Tüm hakları saklıdır.' }),
+      h('span', { text: t('common.copyright') }),
       h('span', { 'aria-hidden': 'true', text: '·' }),
-      h('a', { href: hashFor.about(), class: 'footer-link', text: 'Hakkında' })));
+      h('a', { href: hashFor.about(), class: 'footer-link', text: t('about.title') })));
 
   return screen('screen-home',
     bar,
     h('div', { class: 'brand' },
       icon('glass'),
-      h('h1', { class: 'brand-title', text: 'Son Çay' }),
-      h('p', { class: 'brand-tagline', text: 'Masaya otur, tabancayı çevir. Son çay kimde kalırsa o kazanır.' })),
+      h('h1', { class: 'brand-title', text: t('app.name') }),
+      h('p', { class: 'brand-tagline', text: t('home.tagline') })),
     form);
 }

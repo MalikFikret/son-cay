@@ -6,7 +6,8 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { moveSeat, playerOptions, playerRows, startCheck } from '../src/ui/lobby-model.js';
 import { breakdownLines, formatSigned, matchView, sessionView, statusText } from '../src/ui/tablo-model.js';
-import { TEXT, errorMessage } from '../src/ui/messages.js';
+import { errorMessage } from '../src/ui/messages.js';
+import { t } from '../src/ui/i18n/i18n.js';
 import { ROOM_ERR } from '../src/rooms/index.js';
 
 const seat = (name, joinedAt) => ({ uid: 'u', name, joinedAt });
@@ -108,7 +109,7 @@ describe('Tablo values', () => {
     const view = matchView(summary, 's01');
     assert.equal(view.header, 'Maç 3 · 4 tur · Klasik');
     assert.deepEqual(view.rows.map((r) => [r.rank, r.displayName, r.statusText]), [
-      [1, 'S02', 'Kazandı'], [2, 'S01', '4. turda çıktı'], [3, TEXT.leftPlayer, '2. turda çıktı'],
+      [1, 'S02', 'Kazandı'], [2, 'S01', '4. turda çıktı'], [3, t('tablo.leftPlayer'), '2. turda çıktı'],
     ]);
     assert.deepEqual(view.rows.map((r) => r.me), [false, true, false]);
     assert.deepEqual(view.rows[0].glasses, { full: 3, total: 5 });

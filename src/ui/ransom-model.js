@@ -12,7 +12,7 @@
 // lists ransomAccept only while the offerer still holds the tool, which would tell the recipient
 // something about the offerer's hand. The engine refuses an unfunded accept (OFFER_NOT_FUNDED).
 
-import { TEXT } from './messages.js';
+import { t } from './i18n/i18n.js';
 import { isTool, toolName } from './tools.js';
 
 const holdsHand = (view) => Boolean(view && view.status === 'active' && view.role === 'alive' && view.self);
@@ -34,7 +34,7 @@ export function ransomRow(view) {
 
 /** The pending offer as one line: "Fidye teklifin: Kerem · Pansuman". */
 export function pendingText(pending, nameOf) {
-  return pending ? TEXT.ransomPending(nameOf(pending.to), toolName(pending.tool)) : '';
+  return pending ? t('ransom.ransomPending', nameOf(pending.to), toolName(pending.tool)) : '';
 }
 
 /**
@@ -90,14 +90,14 @@ export function ransomNotices(events, me) {
   const out = [];
   mine.forEach((e, i) => {
     if (e.type === 'ransomPaid') {
-      out.push(e.from === me ? TEXT.ransomAcceptedMine : TEXT.ransomAcceptedOther);
+      out.push(e.from === me ? t('ransom.ransomAcceptedMine') : t('ransom.ransomAcceptedOther'));
     } else if (e.type === 'ransomClosed') {
-      if (e.reason === 'rejected') out.push(TEXT.ransomRejected);
-      else if (e.reason === 'withdrawn') out.push(TEXT.ransomWithdrawn);
+      if (e.reason === 'rejected') out.push(t('ransom.ransomRejected'));
+      else if (e.reason === 'withdrawn') out.push(t('ransom.ransomWithdrawn'));
       else if (e.reason === 'replaced') {
         const renewed = mine.slice(i + 1).some((n) => n.type === 'ransomOffered' && n.from === e.from && n.recipient === e.recipient);
-        if (e.recipient === me && !renewed) out.push(TEXT.ransomWithdrawn);
-      } else out.push(TEXT.ransomLapsed); // jailEnded, eliminated, removed
+        if (e.recipient === me && !renewed) out.push(t('ransom.ransomWithdrawn'));
+      } else out.push(t('ransom.ransomLapsed')); // jailEnded, eliminated, removed
     }
   });
   return out.filter((text, i) => out.indexOf(text) === i);
@@ -105,7 +105,7 @@ export function ransomNotices(events, me) {
 
 /** A refused ransom action as one short line (never a raw code). */
 export function ransomErrorText(error) {
-  if (error?.code === 'OFFER_NOT_FUNDED') return TEXT.ransomNotFunded;
-  if (error?.code === 'NO_OFFER' || error?.code === 'NOT_JAILED') return TEXT.ransomGone;
-  return TEXT.ransomRefused;
+  if (error?.code === 'OFFER_NOT_FUNDED') return t('ransom.ransomNotFunded');
+  if (error?.code === 'NO_OFFER' || error?.code === 'NOT_JAILED') return t('ransom.ransomGone');
+  return t('ransom.ransomRefused');
 }

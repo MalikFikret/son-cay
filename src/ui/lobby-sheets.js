@@ -5,7 +5,8 @@
 import { h } from './dom.js';
 import { errorLine, icon, markInvalid } from './components.js';
 import { moveSeat, startCheck } from './lobby-model.js';
-import { TEXT, errorMessage } from './messages.js';
+import { errorMessage } from './messages.js';
+import { t } from './i18n/i18n.js';
 import { createSheet } from './sheet.js';
 import { NAME_MAX, ROOM_ERR, normalizeName } from '../rooms/index.js';
 
@@ -42,9 +43,9 @@ export function createOptionsSheet({ api, uid, code }) {
     sheet.setTitle(row.name);
     error.clear();
     const items = [];
-    if (options.includes('rename')) items.push(menuItem(TEXT.rename, showRename));
-    if (options.includes('handOver')) items.push(menuItem(TEXT.handOver, () => showConfirm(TEXT.handOverConfirm(row.name), TEXT.handOverYes, () => api.handOverHost({ uid, code, seatId: row.seatId }))));
-    if (options.includes('kick')) items.push(menuItem(TEXT.kick, () => showConfirm(TEXT.kickConfirm(row.name), TEXT.kickYes, () => api.kickSeat({ uid, code, seatId: row.seatId })), true));
+    if (options.includes('rename')) items.push(menuItem(t('players.rename'), showRename));
+    if (options.includes('handOver')) items.push(menuItem(t('players.handOver'), () => showConfirm(t('players.handOverConfirm', row.name), t('players.handOverYes'), () => api.handOverHost({ uid, code, seatId: row.seatId }))));
+    if (options.includes('kick')) items.push(menuItem(t('players.kick'), () => showConfirm(t('players.kickConfirm', row.name), t('players.kickYes'), () => api.kickSeat({ uid, code, seatId: row.seatId })), true));
     sheet.body.replaceChildren(h('div', { class: 'sheet-menu' }, items), error.el);
   }
 
@@ -62,10 +63,10 @@ export function createOptionsSheet({ api, uid, code }) {
       error.clear();
       markInvalid(input, false);
     });
-    const save = actionButton(TEXT.save, 'btn btn-primary');
-    const cancel = actionButton(TEXT.cancel, 'btn btn-outline');
+    const save = actionButton(t('common.save'), 'btn btn-primary');
+    const cancel = actionButton(t('common.cancel'), 'btn btn-outline');
     const form = h('form', { class: 'sheet-form', novalidate: true },
-      h('label', { class: 'label', for: 'rename-input', text: TEXT.newName }),
+      h('label', { class: 'label', for: 'rename-input', text: t('players.newName') }),
       input,
       error.el,
       h('div', { class: 'dialog-actions' }, cancel, save));
@@ -94,7 +95,7 @@ export function createOptionsSheet({ api, uid, code }) {
 
   function showConfirm(question, yesText, action) {
     const yes = actionButton(yesText, 'btn btn-primary');
-    const no = actionButton(TEXT.cancel, 'btn btn-outline');
+    const no = actionButton(t('common.cancel'), 'btn btn-outline');
     no.addEventListener('click', showMenu);
     yes.addEventListener('click', async () => {
       if (await run(yes, error, action)) sheet.close();
@@ -127,17 +128,17 @@ export function createOptionsSheet({ api, uid, code }) {
  * players who sit down are added at the end.
  */
 export function createSeatOrderSheet({ api, uid, code }) {
-  const sheet = createSheet({ title: TEXT.seatOrderTitle });
+  const sheet = createSheet({ title: t('seatOrder.seatOrderTitle') });
   const error = errorLine('seat-order-error');
   const list = h('ol', { class: 'order-list' });
-  const save = actionButton(TEXT.save, 'btn btn-primary');
-  const cancel = actionButton(TEXT.cancel, 'btn btn-outline');
-  const random = h('button', { type: 'button', class: 'link-button', text: TEXT.randomOrder });
+  const save = actionButton(t('common.save'), 'btn btn-primary');
+  const cancel = actionButton(t('common.cancel'), 'btn btn-outline');
+  const random = h('button', { type: 'button', class: 'link-button', text: t('seatOrder.randomOrder') });
   let draft = []; // seat ids
   let names = {};
 
   sheet.body.append(
-    h('p', { class: 'hint', text: TEXT.seatOrderHint }),
+    h('p', { class: 'hint', text: t('seatOrder.seatOrderHint') }),
     list,
     random,
     error.el,
@@ -154,8 +155,8 @@ export function createSeatOrderSheet({ api, uid, code }) {
   function render(focus) {
     list.replaceChildren(...draft.map((seatId, i) => {
       const name = names[seatId] ?? '';
-      const up = h('button', { type: 'button', class: 'stepper-button', 'aria-label': TEXT.moveUp(name), disabled: i === 0 }, icon('up'));
-      const down = h('button', { type: 'button', class: 'stepper-button', 'aria-label': TEXT.moveDown(name), disabled: i === draft.length - 1 }, icon('down'));
+      const up = h('button', { type: 'button', class: 'stepper-button', 'aria-label': t('seatOrder.moveUp', name), disabled: i === 0 }, icon('up'));
+      const down = h('button', { type: 'button', class: 'stepper-button', 'aria-label': t('seatOrder.moveDown', name), disabled: i === draft.length - 1 }, icon('down'));
       up.addEventListener('click', () => move(i, -1));
       down.addEventListener('click', () => move(i, +1));
       return h('li', { class: 'order-row', 'data-seat': seatId },
@@ -210,13 +211,13 @@ export function createSeatOrderSheet({ api, uid, code }) {
  * "Yine de başlat". Everyone seated plays, present or absent.
  */
 export function createStartSheet({ api, uid, code, onStart }) {
-  const sheet = createSheet({ title: TEXT.absentTitle });
+  const sheet = createSheet({ title: t('start.absentTitle') });
   const error = errorLine('start-error');
   const list = h('ul', { class: 'absent-list' });
-  const startButton = actionButton(TEXT.startAnyway, 'btn btn-primary');
-  const cancel = actionButton(TEXT.cancel, 'btn btn-outline');
-  const tooFew = h('p', { class: 'hint', text: TEXT.startTooFew, hidden: true });
-  sheet.body.append(h('p', { class: 'sheet-text', text: TEXT.absentText }), list, tooFew, error.el, h('div', { class: 'dialog-actions' }, cancel, startButton));
+  const startButton = actionButton(t('start.startAnyway'), 'btn btn-primary');
+  const cancel = actionButton(t('common.cancel'), 'btn btn-outline');
+  const tooFew = h('p', { class: 'hint', text: t('start.startTooFew'), hidden: true });
+  sheet.body.append(h('p', { class: 'sheet-text', text: t('start.absentText') }), list, tooFew, error.el, h('div', { class: 'dialog-actions' }, cancel, startButton));
   cancel.addEventListener('click', () => sheet.close());
   startButton.addEventListener('click', async () => {
     if (await run(startButton, error, onStart)) sheet.close();
@@ -225,7 +226,7 @@ export function createStartSheet({ api, uid, code, onStart }) {
   function render(rows) {
     const { canStart, absent } = startCheck(rows);
     list.replaceChildren(...absent.map((row) => {
-      const kick = h('button', { type: 'button', class: 'btn-small is-danger', text: TEXT.kick });
+      const kick = h('button', { type: 'button', class: 'btn-small is-danger', text: t('players.kick') });
       kick.addEventListener('click', () => run(kick, error, () => api.kickSeat({ uid, code, seatId: row.seatId })));
       return h('li', { class: 'absent-row' },
         h('span', { class: 'presence-dot', 'aria-hidden': 'true' }),

@@ -1,19 +1,18 @@
-// Game UI: error codes to Turkish messages (src/ui/messages.js), and the generated version
-// module (src/ui/version.js).
+// Game UI: error codes to messages (src/ui/messages.js over the locale in src/ui/i18n/), and the
+// generated version module (src/ui/version.js).
 
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { ROOM_ERR, RoomError } from '../src/rooms/index.js';
-import {
-  FORM_MESSAGES,
-  GENERIC_MESSAGE,
-  OFFLINE_MESSAGE,
-  RETRY_WAIT_CODES,
-  RETRY_WAIT_SECONDS,
-  ROOM_MESSAGES,
-  errorMessage,
-} from '../src/ui/messages.js';
+import { RETRY_WAIT_CODES, RETRY_WAIT_SECONDS, errorMessage } from '../src/ui/messages.js';
+import { t } from '../src/ui/i18n/i18n.js';
+import tr from '../src/ui/i18n/tr.js';
+
+const ROOM_MESSAGES = tr.errors.room;
+const FORM_MESSAGES = tr.errors.form;
+const GENERIC_MESSAGE = t('errors.generic');
+const OFFLINE_MESSAGE = t('errors.offline');
 import { COMMIT, VERSION } from '../src/ui/version.js';
 
 describe('error messages', () => {
@@ -49,6 +48,8 @@ describe('error messages', () => {
     assert.equal(errorMessage(null), GENERIC_MESSAGE);
     assert.equal(errorMessage('toString'), GENERIC_MESSAGE); // no prototype lookups
     assert.equal(errorMessage({ code: '__proto__' }), GENERIC_MESSAGE);
+    assert.equal(errorMessage('room.WRONG_PIN'), GENERIC_MESSAGE); // a code is never a key path
+    assert.equal(errorMessage('generic'), GENERIC_MESSAGE);
     assert.equal(errorMessage(new Error('Client is offline.')), OFFLINE_MESSAGE);
     assert.equal(errorMessage({ code: 'auth/network-request-failed', message: 'x' }), OFFLINE_MESSAGE);
   });

@@ -15,7 +15,8 @@ import { connect } from './firebase.js';
 import { forgetCode, rememberCode, rememberedCode } from './memory.js';
 import { tableGuard } from './home-model.js';
 import { createSeatKeeper } from './seat-keeper.js';
-import { FORM_MESSAGES, errorMessage } from './messages.js';
+import { errorMessage } from './messages.js';
+import { initLanguage, onLanguageChange, t } from './i18n/i18n.js';
 import { ROUTES, hashFor, parseRoute } from './routes.js';
 import { aboutScreen } from './screens/about.js';
 import { ROOM_CLOSED_MS, closedScreen } from './screens/closed.js';
@@ -27,7 +28,6 @@ import { sitScreen } from './screens/sit.js';
 import { ROOM_ERR } from '../rooms/index.js';
 
 const root = document.getElementById('app');
-const TITLE = 'Son Çay';
 
 const ctx = {
   api: null,
@@ -99,9 +99,10 @@ function startView() {
   return { active: () => state.alive, onLeave: (fn) => state.leave.push(fn) };
 }
 
-function show(node, title) {
+/** `titleKey`: the locale key of the page's name in the document title ("Son Çay: masa"). */
+function show(node, titleKey) {
   replace(root, node);
-  document.title = title ? `${TITLE}: ${title}` : TITLE;
+  document.title = titleKey ? t('app.pageTitle', t(titleKey)) : t('app.name');
   window.scrollTo(0, 0);
 }
 
@@ -120,7 +121,7 @@ function goHome(message, { info = false } = {}) {
 function showRoomClosed(code) {
   if (rememberedCode() === code) forgetCode();
   const view = startView();
-  show(closedScreen({ code, onHome: () => { if (view.active()) goHome(); } }), 'masa kapatıldı');
+  show(closedScreen({ code, onHome: () => { if (view.active()) goHome(); } }), 'app.titleClosed');
   const timer = setTimeout(() => {
     if (view.active()) goHome();
   }, ROOM_CLOSED_MS);
@@ -153,12 +154,12 @@ function blockedByOwnTable(intent, code) {
 function tableProblem(code, failure) {
   const notFound = failure?.code === ROOM_ERR.ROOM_NOT_FOUND;
   show(problemScreen({
-    title: `Masa ${code}`,
+    title: t('common.tableTitle', code),
     message: errorMessage(failure),
-    actionText: notFound ? 'Ana sayfaya dön' : 'Tekrar dene',
+    actionText: notFound ? t('common.toHome') : t('app.retry'),
     onAction: notFound ? () => ctx.go(hashFor.home()) : () => route(),
     onBack: () => ctx.go(hashFor.home()),
-  }), 'masa');
+  }), 'app.titleTable');
 }
 
 // #/masa/CODE: my seat if I hold one there, else the join screen.
@@ -171,12 +172,12 @@ async function showTable(view, code) {
       rememberCode(code);
       const message = flash;
       flash = null;
-      show(lobbyScreen(ctx, view, { code, mine, message }), 'bekleme salonu');
+      show(lobbyScreen(ctx, view, { code, mine, message }), 'app.titleLobby');
       return;
     }
     if (rememberedCode() === code) forgetCode();
     const summary = await ctx.api.getRoomSummary({ uid: ctx.uid, code });
-    if (view.active()) show(sitScreen(ctx, view, { summary }), 'masaya otur');
+    if (view.active()) show(sitScreen(ctx, view, { summary }), 'app.titleSit');
   } catch (failure) {
     if (!view.active()) return;
     // The table no longer exists (closed by its host, or its last player left).
@@ -196,7 +197,7 @@ async function showRecover(view, code) {
       return;
     }
     const summary = await ctx.api.getRoomSummary({ uid: ctx.uid, code });
-    if (view.active()) show(recoverScreen(ctx, view, { summary }), 'yerine dön');
+    if (view.active()) show(recoverScreen(ctx, view, { summary }), 'app.titleRecover');
   } catch (failure) {
     if (!view.active()) return;
     if (failure?.code === ROOM_ERR.ROOM_NOT_FOUND) showRoomClosed(code);
@@ -225,10 +226,10 @@ function route() {
     case ROUTES.CREATE:
       // Seated: back to Giriş (e.g. browser back from the table after creating it).
       if (blockedByOwnTable('create')) return;
-      show(sitScreen(ctx, view, {}), 'yeni masa');
+      show(sitScreen(ctx, view, {}), 'app.titleCreate');
       return;
     case ROUTES.ABOUT:
-      show(aboutScreen(ctx, view), 'hakkında');
+      show(aboutScreen(ctx, view), 'app.titleAbout');
       return;
     case ROUTES.TABLE:
       if (blockedByOwnTable('join', current.code)) return;
@@ -241,7 +242,7 @@ function route() {
       showRecover(view, current.code);
       return;
     case ROUTES.BAD_CODE:
-      goHome(FORM_MESSAGES.BAD_INVITE);
+      goHome(errorMessage('BAD_INVITE'));
       return;
     default:
       goHome();
@@ -283,21 +284,25 @@ async function roomGone(code) {
 }
 
 async function start() {
-  showLoading('Bağlanıyor…');
+  // The device's language (decision Q71): stored choice, else the browser's, else Turkish.
+  initLanguage();
+  showLoading(t('app.connecting'));
   try {
     Object.assign(ctx, await connect());
     ctx.keeper = createSeatKeeper({ api: ctx.api, uid: ctx.uid });
   } catch {
     show(problemScreen({
-      title: TITLE,
-      message: FORM_MESSAGES.CONNECT_FAILED,
-      actionText: 'Tekrar dene',
+      title: t('app.name'),
+      message: errorMessage('CONNECT_FAILED'),
+      actionText: t('app.retry'),
       onAction: () => location.reload(),
       onBack: () => location.reload(),
     }));
     return;
   }
   await restoreRememberedTable();
+  // A language change draws the current screen again (no switch in the UI yet).
+  onLanguageChange(() => ctx.refresh());
   window.addEventListener('hashchange', route);
   route();
 }

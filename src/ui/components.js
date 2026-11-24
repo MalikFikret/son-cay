@@ -3,6 +3,7 @@
 
 import { NAME_MAX } from '../rooms/index.js';
 import { h, svg } from './dom.js';
+import { hasText, t } from './i18n/i18n.js';
 
 export const ICONS = Object.freeze({
   back: ['svg', { width: 18, height: 18, viewBox: '0 0 18 18', 'aria-hidden': 'true' },
@@ -47,14 +48,21 @@ export const ICONS = Object.freeze({
   clock: ['svg', { width: 18, height: 18, viewBox: '0 0 18 18', 'aria-hidden': 'true' },
     ['circle', { cx: 9, cy: 9, r: 7.5, fill: 'none', stroke: '#B8AD9C', 'stroke-width': 1.5 }],
     ['path', { d: 'M9 4.5 V9 L12 11', fill: 'none', stroke: '#B8AD9C', 'stroke-width': 1.5, 'stroke-linecap': 'round' }]],
-  glass: ['svg', { role: 'img', 'aria-label': 'Çay bardağı', width: 70, height: 104, viewBox: '0 0 70 104' },
+  // The glass is the only icon with a name (aria-label, added by icon() in the current language).
+  glass: ['svg', { role: 'img', width: 70, height: 104, viewBox: '0 0 70 104' },
     ['ellipse', { cx: 35, cy: 98, rx: 30, ry: 5, fill: 'none', stroke: '#2F8F88', 'stroke-width': 2 }],
     ['path', { d: 'M6 6 H64 L50 44 L58 94 H12 L20 44 Z', fill: 'none', stroke: '#EFE6D6', 'stroke-opacity': 0.8, 'stroke-width': 2.5, 'stroke-linejoin': 'round' }],
     ['path', { d: 'M14 74 H56 L58 92 H12 Z', fill: '#B4532A' }],
     ['path', { d: 'M27 14 C26 24 30 28 34 30', fill: 'none', stroke: '#F2ECDD', 'stroke-opacity': 0.5, 'stroke-width': 2, 'stroke-linecap': 'round' }]],
 });
 
-export const icon = (name) => svg(ICONS[name]);
+const ICON_LABELS = Object.freeze({ glass: 'common.teaGlass' });
+
+export function icon(name) {
+  const el = svg(ICONS[name]);
+  if (Object.prototype.hasOwnProperty.call(ICON_LABELS, name)) el.setAttribute('aria-label', t(ICON_LABELS[name]));
+  return el;
+}
 
 /** The full-height column every screen lives in. */
 export function screen(className, ...children) {
@@ -65,7 +73,7 @@ export function screen(className, ...children) {
 export function header({ title, subtitle, onBack }) {
   const subtitleEl = h('span', { class: 'header-sub', text: subtitle ?? '' });
   const el = h('header', { class: 'header' },
-    h('button', { type: 'button', class: 'back', 'aria-label': 'Geri', on: { click: onBack } }, icon('back')),
+    h('button', { type: 'button', class: 'back', 'aria-label': t('common.back'), on: { click: onBack } }, icon('back')),
     h('div', { class: 'header-text' },
       h('h1', { class: 'header-title', text: title }),
       subtitleEl));
@@ -88,21 +96,21 @@ export function errorLine(id) {
   };
 }
 
-/** The "Adın" field. */
+/** The name field ("Adın"). */
 export function nameField(id) {
   const input = h('input', {
     id, type: 'text', class: 'input input-name', maxlength: NAME_MAX, autocomplete: 'nickname',
     autocapitalize: 'words', spellcheck: 'false',
   });
   const el = h('div', { class: 'field' },
-    h('label', { class: 'label', for: id, text: 'Adın' }),
+    h('label', { class: 'label', for: id, text: t('fields.name') }),
     input,
-    h('span', { class: 'hint', text: 'Masadaki herkes bu adı görür.' }));
+    h('span', { class: 'hint', text: t('fields.nameHint') }));
   return { el, input };
 }
 
 /**
- * The "Şifren" field: 4 digits, masked, never stored. Non-digits are dropped as they are typed.
+ * The PIN field ("Şifren"): 4 digits, masked, never stored. Non-digits are dropped as they are typed.
  * @param {string} id
  * @param {string | null} hint
  */
@@ -116,7 +124,7 @@ export function pinField(id, hint, describedBy) {
     if (digits !== input.value) input.value = digits;
   });
   const el = h('div', { class: 'field' },
-    h('label', { class: 'label', for: id, text: 'Şifren' }),
+    h('label', { class: 'label', for: id, text: t('fields.pin') }),
     input,
     hint ? h('span', { class: 'hint', text: hint }) : null);
   return { el, input };
@@ -143,7 +151,7 @@ export async function whileBusy(button, busyText, task) {
 }
 
 /** A short centered "loading" placeholder for screens that read before they can draw. */
-export function loading(text = 'Yükleniyor…') {
+export function loading(text = t('common.loading')) {
   return h('p', { class: 'loading', role: 'status', text });
 }
 
@@ -171,8 +179,12 @@ export async function copyText(text) {
   }
 }
 
-export const MODE_LABELS = Object.freeze({ classic: 'Klasik', custom: 'Özel' });
-
+/** The name of a game mode ("Klasik" / "Özel") in the current language, '' for anything else. */
 export function modeLabel(mode) {
-  return Object.prototype.hasOwnProperty.call(MODE_LABELS, mode) ? MODE_LABELS[mode] : '';
+  return typeof mode === 'string' && /^[a-z]+$/.test(mode) && hasText(`modes.${mode}`) ? t(`modes.${mode}`) : '';
+}
+
+/** The one-line explanation of a game mode, '' for anything else. */
+export function modeHint(mode) {
+  return typeof mode === 'string' && /^[a-z]+$/.test(mode) && hasText(`modeHints.${mode}`) ? t(`modeHints.${mode}`) : '';
 }

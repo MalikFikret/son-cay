@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { applyAction, createMatch, eventsFor, listLegalActions, viewFor } from '../src/engine/index.js';
 import { LONG_PRESS_MS, PRESS, initialPress, isPressing, pressStep } from '../src/ui/fire-press.js';
-import { TEXT } from '../src/ui/messages.js';
+import { t } from '../src/ui/i18n/i18n.js';
 import {
   SEAT_SIZES,
   STAGE_WIDTH,
@@ -283,12 +283,12 @@ describe('the last-move line and the seats\' tags', () => {
       pub('eliminated', { player: 's02', by: 's04', round: 2 }),
       pub('turnStarted', { player: 's01' }),
     ];
-    assert.deepEqual(lastMove(events, nameOf), { lead: TEXT.shotAtOther('Zeynep', 'Kerem'), effect: 'live', tail: TEXT.playerOut('Kerem') });
+    assert.deepEqual(lastMove(events, nameOf), { lead: t('table.shotAtOther', 'Zeynep', 'Kerem'), effect: 'live', tail: t('table.playerOut', 'Kerem') });
   });
 
   test('a shot at oneself, and the automatic shot of a timeout', () => {
-    assert.deepEqual(lastMove([pub('shot', { shooter: 's01', target: 's01', effect: 'blank', auto: false })], nameOf), { lead: TEXT.shotAtSelf('Malik'), effect: 'blank', tail: '' });
-    assert.equal(lastMove([pub('timedOut'), pub('shot', { shooter: 's03', target: 's03', effect: 'live', auto: true })], nameOf).lead, TEXT.shotOnTimeout('Selin'));
+    assert.deepEqual(lastMove([pub('shot', { shooter: 's01', target: 's01', effect: 'blank', auto: false })], nameOf), { lead: t('table.shotAtSelf', 'Malik'), effect: 'blank', tail: '' });
+    assert.equal(lastMove([pub('timedOut'), pub('shot', { shooter: 's03', target: 's03', effect: 'live', auto: true })], nameOf).lead, t('table.shotOnTimeout', 'Selin'));
   });
 
   test('only public events: a private event never shows', () => {
@@ -297,11 +297,11 @@ describe('the last-move line and the seats\' tags', () => {
       { type: 'toolUsed', tool: 'detector', by: 's01', chamber: 'live', visibility: 'private', to: ['s01'] },
       { type: 'targetChosen', player: 's01', target: 's03', visibility: 'private', to: ['s01'] },
     ];
-    assert.deepEqual(lastMove(events, nameOf), { lead: TEXT.shotAtOther('Malik', 'Kerem'), effect: 'blank', tail: '' });
+    assert.deepEqual(lastMove(events, nameOf), { lead: t('table.shotAtOther', 'Malik', 'Kerem'), effect: 'blank', tail: '' });
   });
 
   test('before any shot: "Maç başladı."; nothing at all: null', () => {
-    assert.deepEqual(lastMove([pub('matchStarted'), pub('reloaded'), pub('turnStarted')], nameOf), { lead: TEXT.matchBegan, effect: null, tail: '' });
+    assert.deepEqual(lastMove([pub('matchStarted'), pub('reloaded'), pub('turnStarted')], nameOf), { lead: t('table.matchBegan'), effect: null, tail: '' });
     assert.equal(lastMove([], nameOf), null);
   });
 
@@ -313,10 +313,10 @@ describe('the last-move line and the seats\' tags', () => {
 
   test('seat tags: me, the current player, my target, absent, "N. turda çıktı"', () => {
     const info = { viewerId: 's01', turnId: 's02', target: null, present: true };
-    assert.deepEqual(seatTags({ id: 's01', alive: true }, info), [TEXT.tagMe]);
-    assert.deepEqual(seatTags({ id: 's02', alive: true }, info), [TEXT.tagTurn]);
-    assert.deepEqual(seatTags({ id: 's03', alive: true }, { ...info, target: 's03', present: false }), [TEXT.tagTarget, TEXT.tagAbsent]);
-    assert.deepEqual(seatTags({ id: 's01', alive: true }, { ...info, turnId: 's01', target: 's01' }), [TEXT.tagMe, TEXT.tagTarget]);
+    assert.deepEqual(seatTags({ id: 's01', alive: true }, info), [t('table.tagMe')]);
+    assert.deepEqual(seatTags({ id: 's02', alive: true }, info), [t('table.tagTurn')]);
+    assert.deepEqual(seatTags({ id: 's03', alive: true }, { ...info, target: 's03', present: false }), [t('table.tagTarget'), t('table.tagAbsent')]);
+    assert.deepEqual(seatTags({ id: 's01', alive: true }, { ...info, turnId: 's01', target: 's01' }), [t('table.tagMe'), t('table.tagTarget')]);
     assert.deepEqual(seatTags({ id: 's04', alive: false }, { ...info, out: { round: 2, removed: false } }), ['2. turda çıktı']);
   });
 

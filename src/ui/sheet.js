@@ -4,7 +4,7 @@
 
 import { h } from './dom.js';
 import { icon } from './components.js';
-import { TEXT } from './messages.js';
+import { t } from './i18n/i18n.js';
 
 const SWIPE_CLOSE_PX = 80;
 let counter = 0;
@@ -19,7 +19,7 @@ export function createSheet({ title = '', tall = false, className = '', onClose 
   counter += 1;
   const titleId = `sheet-title-${counter}`;
   const titleEl = h('h2', { class: 'sheet-title', id: titleId, text: title });
-  const closeButton = h('button', { type: 'button', class: 'sheet-close', 'aria-label': TEXT.close }, icon('close'));
+  const closeButton = h('button', { type: 'button', class: 'sheet-close', 'aria-label': t('common.close') }, icon('close'));
   const head = h('div', { class: 'sheet-head' },
     h('span', { class: 'sheet-handle', 'aria-hidden': 'true' }),
     h('div', { class: 'sheet-title-row' }, titleEl, closeButton));

@@ -8,7 +8,7 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { LOOT_SECONDS, applyAction, eventsFor, listLegalActions, viewFor } from '../src/engine/index.js';
-import { TEXT } from '../src/ui/messages.js';
+import { t } from '../src/ui/i18n/i18n.js';
 import { keepLootPick, lootAction, lootCards, lootErrorText, lootPick, lootTexts } from '../src/ui/loot-model.js';
 import { handState, effectsStrip, cardButton } from '../src/ui/tool-model.js';
 import { lastMove, seatTags, statusText, revolverSeat } from '../src/ui/table-model.js';
@@ -60,8 +60,8 @@ describe('Ganimet card', () => {
     const action = lootAction(card, null);
     assert.deepEqual(action, { type: 'lootChoice', victim: 'p2', choice: { kind: 'none' } });
     assert.deepEqual(viewFor(act(state, { ...action, playerId: 'p1' }).state, 'p1').self.loots, []);
-    assert.equal(TEXT.lootEmpty, 'Eli boştu');
-    assert.equal(TEXT.lootNothing, 'Alacak bir şey yok.');
+    assert.equal(t('loot.lootEmpty'), 'Eli boştu');
+    assert.equal(t('loot.lootNothing'), 'Alacak bir şey yok.');
   });
 
   test('a double kill shows two rows, each with its own choice', () => {

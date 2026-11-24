@@ -3,8 +3,8 @@
 // watchLobby for "Oturum"); this file only turns it into display values.
 
 import { SHOT_KINDS } from '../rooms/index.js';
-import { MODE_LABELS } from './lobby-model.js';
-import { TEXT } from './messages.js';
+import { modeLabel } from './components.js';
+import { t } from './i18n/i18n.js';
 
 const MINUS = '−';
 
@@ -17,18 +17,18 @@ export function formatSigned(points) {
 }
 
 const SHOT_LABELS = Object.freeze({
-  liveOnOther: TEXT.lineLiveOnOther,
-  blankOnOther: TEXT.lineBlankOnOther,
-  blankOnSelf: TEXT.lineBlankOnSelf,
-  liveOnSelf: TEXT.lineLiveOnSelf,
+  liveOnOther: t('tablo.lineLiveOnOther'),
+  blankOnOther: t('tablo.lineBlankOnOther'),
+  blankOnSelf: t('tablo.lineBlankOnSelf'),
+  liveOnSelf: t('tablo.lineLiveOnSelf'),
 });
 
 /** The status line under a name: "Kazandı", "N. turda çıktı", ... */
 export function statusText(row, result) {
-  if (row.status === 'won') return TEXT.won;
-  if (row.status === 'eliminated') return TEXT.outInRound(row.outRound);
-  if (row.status === 'removed') return TEXT.removedInRound(row.outRound);
-  return result === 'draw' ? TEXT.draw : '';
+  if (row.status === 'won') return t('tablo.won');
+  if (row.status === 'eliminated') return t('tablo.outInRound', row.outRound);
+  if (row.status === 'removed') return t('tablo.removedInRound', row.outRound);
+  return result === 'draw' ? t('tablo.draw') : '';
 }
 
 /**
@@ -39,15 +39,15 @@ export function statusText(row, result) {
  */
 export function breakdownLines(row, mode) {
   const b = row.breakdown;
-  const times = (count) => (count > 0 ? TEXT.times(count) : '—');
+  const times = (count) => (count > 0 ? t('tablo.times', count) : '—');
   const lines = SHOT_KINDS.map((kind) => ({ label: SHOT_LABELS[kind], count: times(b[kind].count), points: formatSigned(b[kind].points) }));
-  lines.push({ label: TEXT.lineEliminations, count: times(b.eliminations.count), points: formatSigned(b.eliminations.points) });
-  lines.push({ label: TEXT.lineRounds(b.rounds.count), count: '', points: formatSigned(b.rounds.points) });
-  lines.push({ label: TEXT.lineWin, count: '—', points: b.win.points === 0 ? '—' : formatSigned(b.win.points) });
+  lines.push({ label: t('tablo.lineEliminations'), count: times(b.eliminations.count), points: formatSigned(b.eliminations.points) });
+  lines.push({ label: t('tablo.lineRounds', b.rounds.count), count: '', points: formatSigned(b.rounds.points) });
+  lines.push({ label: t('tablo.lineWin'), count: '—', points: b.win.points === 0 ? '—' : formatSigned(b.win.points) });
   if (mode === 'custom' || b.predictions.count > 0) {
-    lines.push({ label: TEXT.linePredictions, count: times(b.predictions.count), points: formatSigned(b.predictions.points) });
+    lines.push({ label: t('tablo.linePredictions'), count: times(b.predictions.count), points: formatSigned(b.predictions.points) });
   }
-  lines.push({ label: TEXT.lineTotal, count: '', points: String(row.points), total: true });
+  lines.push({ label: t('tablo.lineTotal'), count: '', points: String(row.points), total: true });
   return lines;
 }
 
@@ -59,11 +59,11 @@ export function breakdownLines(row, mode) {
 export function matchView(summary, mySeat) {
   if (!summary) return null;
   return {
-    header: TEXT.matchHeader(summary.n, summary.rounds, MODE_LABELS[summary.mode] ?? ''),
+    header: t('tablo.matchHeader', summary.n, summary.rounds, modeLabel(summary.mode)),
     rows: summary.rows.map((row, i) => ({
       ...row,
       rank: i + 1,
-      displayName: row.name ?? TEXT.leftPlayer,
+      displayName: row.name ?? t('tablo.leftPlayer'),
       me: row.seatId === mySeat && row.name !== null,
       out: row.status === 'eliminated' || row.status === 'removed',
       statusText: statusText(row, summary.result),
@@ -84,7 +84,7 @@ export function matchView(summary, mySeat) {
  */
 export function sessionView(session, names, mySeat) {
   return {
-    header: session.matches > 0 ? TEXT.sessionHeader(session.matches) : TEXT.noSessionYet,
+    header: session.matches > 0 ? t('tablo.sessionHeader', session.matches) : t('tablo.noSessionYet'),
     rows: session.rows.map((row, i) => ({
       ...row,
       rank: i + 1,
@@ -111,10 +111,10 @@ export function liveMatchView(summary, { mySeat, names, present, round, ended })
   if (ended) return view;
   const alive = summary.rows.filter((row) => row.status === 'alive').length;
   return {
-    header: TEXT.liveHeader(round, alive, summary.rows.length, MODE_LABELS[summary.mode] ?? ''),
-    footnote: TEXT.liveFootnote,
+    header: t('liveTablo.liveHeader', round, alive, summary.rows.length, modeLabel(summary.mode)),
+    footnote: t('liveTablo.liveFootnote'),
     rows: view.rows.map((row) => (row.status === 'alive'
-      ? { ...row, statusText: present(row.seatId) ? TEXT.inGame : `${TEXT.tagAbsent} · ${TEXT.inGame}` }
+      ? { ...row, statusText: present(row.seatId) ? t('liveTablo.inGame') : t('liveTablo.absentInGame') }
       : row)),
   };
 }

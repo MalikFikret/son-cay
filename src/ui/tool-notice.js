@@ -7,7 +7,7 @@
 // receipts (private events `by` me and `to` me) of the update. Another device never receives
 // these events, so it can never build this notice.
 
-import { TEXT } from './messages.js';
+import { t } from './i18n/i18n.js';
 import { detectionResults, resultText } from './tool-model.js';
 import { toolName } from './tools.js';
 
@@ -31,7 +31,7 @@ export function toolNotice(events, viewerId) {
   return {
     tool: result.tool,
     name: toolName(result.tool),
-    word: last ? TEXT.toolNoticeLast : text.strong,
+    word: last ? t('toolNotice.toolNoticeLast') : text.strong,
     scope: scopeOf(text.text),
     durationMs: TOOL_NOTICE_MS,
   };

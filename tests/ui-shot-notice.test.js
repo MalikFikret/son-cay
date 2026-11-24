@@ -5,7 +5,7 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { SHOT_NOTICE_BASE_MS, SHOT_NOTICE_ROW_MS, shotNotice } from '../src/ui/shot-notice.js';
-import { TOOL_NAMES } from '../src/ui/tools.js';
+import { toolName } from '../src/ui/tools.js';
 import { act, edit, play, setup, shoot, use } from './helpers.js';
 
 const NAMES = { p1: 'Kerem', p2: 'Selin', p3: 'Yusuf', p4: 'Zeynep' };
@@ -134,7 +134,7 @@ describe('shotNotice: hidden tools never show', () => {
   const HIDDEN = /Mermi Çevir|Hokkabaz|Kaydır|flip|swap|skip|ters|kaydır/i;
 
   for (const [tool, chambers, expectWord] of [['flip', 'LBB', 'Boş'], ['skip', 'LBB', 'Boş'], ['swap', 'LBB', 'Boş']]) {
-    test(`${TOOL_NAMES[tool]} before the shot: the notice equals the one built from public events only`, () => {
+    test(`${toolName(tool)} before the shot: the notice equals the one built from public events only`, () => {
       const { events } = play(setup({ chambers, hands: { p1: [tool] } }), use('p1', tool), shoot('p1', 'p2'));
       assert.ok(events.some((e) => e.visibility !== 'public'), 'the hidden tool left private events');
       const notice = shotNotice(events, nameOf);

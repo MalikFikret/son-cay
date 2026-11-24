@@ -5,7 +5,7 @@
 
 import { h } from './dom.js';
 import { errorLine } from './components.js';
-import { TEXT } from './messages.js';
+import { t } from './i18n/i18n.js';
 
 /**
  * @param {{ id: string, onConfirm: () => Promise<string | null> }} options
@@ -16,14 +16,14 @@ export function createCloseRoom({ id, onConfirm }) {
   let enabled = false;
   let busy = false;
 
-  const button = h('button', { type: 'button', class: 'btn-close-room', text: TEXT.closeRoom, 'aria-describedby': `${id}-hint` });
+  const button = h('button', { type: 'button', class: 'btn-close-room', text: t('closeRoom.closeRoom'), 'aria-describedby': `${id}-hint` });
   const hint = h('span', { class: 'hint close-room-hint', id: `${id}-hint`, hidden: true });
   const error = errorLine(`${id}-error`);
-  const no = h('button', { type: 'button', class: 'btn btn-outline', text: TEXT.cancel });
-  const yes = h('button', { type: 'button', class: 'btn btn-close-yes', text: TEXT.closeRoomYes });
+  const no = h('button', { type: 'button', class: 'btn btn-outline', text: t('common.cancel') });
+  const yes = h('button', { type: 'button', class: 'btn btn-close-yes', text: t('closeRoom.closeRoomYes') });
   const confirm = h('div', { class: 'close-room-confirm', role: 'group', 'aria-labelledby': `${id}-title`, hidden: true },
-    h('p', { class: 'close-room-title', id: `${id}-title`, text: TEXT.closeRoomTitle }),
-    h('p', { class: 'muted', text: TEXT.closeRoomNote }),
+    h('p', { class: 'close-room-title', id: `${id}-title`, text: t('closeRoom.closeRoomTitle') }),
+    h('p', { class: 'muted', text: t('closeRoom.closeRoomNote') }),
     error.el,
     h('div', { class: 'dialog-actions' }, no, yes));
   const el = h('section', { class: 'close-room', hidden: true }, button, hint, confirm);
@@ -51,13 +51,13 @@ export function createCloseRoom({ id, onConfirm }) {
     busy = true;
     yes.disabled = true;
     no.disabled = true;
-    yes.textContent = TEXT.closingRoom;
+    yes.textContent = t('closeRoom.closingRoom');
     error.clear();
     const failure = await onConfirm();
     busy = false;
     yes.disabled = false;
     no.disabled = false;
-    yes.textContent = TEXT.closeRoomYes;
+    yes.textContent = t('closeRoom.closeRoomYes');
     if (failure) error.show(failure);
   });
 
