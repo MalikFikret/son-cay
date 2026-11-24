@@ -85,6 +85,8 @@ describe('index.html', () => {
 
   test('connects only to the local emulators and to what the real project needs, each host once', () => {
     assert.deepEqual(directives['connect-src'], [
+      // this site: the shot sounds (src/ui/audio/, decision Q78)
+      "'self'",
       // localhost: the emulators
       'http://127.0.0.1:9099',
       'http://127.0.0.1:9000',
@@ -99,7 +101,7 @@ describe('index.html', () => {
     ]);
     // Every added host is explained in the comment above the tag.
     const comment = html.match(/<!-- Content-Security-Policy:([\s\S]*?)-->/)?.[1] ?? '';
-    for (const source of directives['connect-src'].slice(3)) assert.ok(comment.includes(source), `${source} is explained`);
+    for (const source of [directives['connect-src'][0], ...directives['connect-src'].slice(4)]) assert.ok(comment.includes(source), `${source} is explained`);
   });
 
   test('sends only the origin as referrer (the API key is restricted to the website)', () => {

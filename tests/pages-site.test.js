@@ -31,10 +31,13 @@ describe('the published folder', () => {
       const published = walk(out).sort();
       const source = walk(fileURLToPath(new URL('src', root))).map((p) => `src/${p}`);
       assert.deepEqual(published, ['index.html', ...source].sort());
-      for (const path of published) assert.ok(path === 'index.html' || /^src\/.+\.(js|css|svg)$/.test(path), path);
+      for (const path of published) assert.ok(path === 'index.html' || /^src\/.+\.(js|css|svg|mp3)$/.test(path), path);
       assert.ok(published.includes('src/ui/app.js'));
       assert.ok(published.includes('src/engine/index.js'));
       assert.ok(published.includes('src/rooms/index.js'));
+      // The shot sounds (decision Q78), fetched by src/ui/sounds.js.
+      assert.ok(published.includes('src/ui/audio/shot-loaded.mp3'));
+      assert.ok(published.includes('src/ui/audio/shot-empty.mp3'));
     } finally {
       rmSync(out, { recursive: true, force: true });
     }

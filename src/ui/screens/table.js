@@ -71,6 +71,7 @@ import {
 } from '../ransom-model.js';
 import { revolverSvg, SHOT_TIMING } from '../revolver.js';
 import { chosenRevolver, motionOn, onSettingsChange } from '../device-settings.js';
+import { playShot, playSound, startHammer, stopHammer } from '../sounds.js';
 import { LONG_PRESS_MS, initialPress, isPressing, pressStep } from '../fire-press.js';
 import {
   QUICK_SPIN_MIN_DEG,
@@ -113,6 +114,8 @@ import { ROOM_ERR, isSeatPresent, summarizeView } from '../../rooms/index.js';
 
 const LOST_CODES = [ROOM_ERR.SEAT_LOST, ROOM_ERR.NOT_MEMBER, ROOM_ERR.ROOM_NOT_FOUND];
 const RELOAD_SHOW_MS = 2200; // the reload announcement stays this long
+const FRESH_START_MS = 4000; // a match's first update this young is heard (sounds, step 4.4c)
+const TURN_AFTER_RELOAD_MS = 1300; // the turn chime waits for the reload sound
 const END_HOLD_MS = 1600; // the final table stays this long before the end screen
 const ERROR_SHOW_MS = 6000;
 const RING = 2 * Math.PI * 22; // countdown ring circumference (r = 22)
@@ -785,6 +788,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
     round = lastRound(update.events, round);
     events = events.concat(update.events);
     const wasMine = applied?.view.turn.playerId === mySeat;
+    const turnWasMine = wasMine && applied.view.status === 'active';
     applied = update;
     if (shots.length > 0 || !wasMine) target = null;
     target = keepTarget(target, myTargets());
@@ -800,7 +804,25 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
     tablo.refresh();
     const reload = reloadFor(update);
     if (reload) showReload(reload);
+    // Sounds (step 4.4c): only for a live update played in time, or the very start of the match
+    // (its first update is an "initial" one); never replayed on a reloaded page.
+    const audible = animate || freshStart(update);
+    const loaded = update.view.round?.announced;
+    const reloadSound = Boolean(reload) && audible
+      && playSound('reload', { count: loaded ? loaded.live + loaded.blank : undefined });
+    if (audible && !turnWasMine && myTurn()) {
+      // The turn became mine: the chime, after the reload sound if both come together.
+      if (reloadSound) later(() => { if (myTurn()) playSound('turn'); }, TURN_AFTER_RELOAD_MS);
+      else playSound('turn');
+    }
     evaluatePress();
+  }
+
+  // The first update of a match that has just started (nothing played yet, its countdown a moment
+  // old): heard like a live update, unlike a reloaded page.
+  function freshStart(update) {
+    if (!update.initial || update.seq !== 0 || typeof update.clockAt !== 'number') return false;
+    return Date.now() + offset - update.clockAt < FRESH_START_MS;
   }
 
   // --- Rendering -------------------------------------------------------------------------------
@@ -1425,6 +1447,10 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
     void revolverWrap.offsetWidth; // restart the keyframes
     revolverWrap.classList.add(live ? 'is-live' : 'is-blank');
     const total = live ? (reduced ? SHOT_TIMING.reducedLive : SHOT_TIMING.live) : (reduced ? SHOT_TIMING.reducedBlank : SHOT_TIMING.blank);
+    // The sound with the picture: the gunshot with the flame, the dry click as the hammer falls;
+    // twice for a doubled shot (Çift Ateş, the public shot event's `doubled`, decision Q78).
+    later(() => playShot(live, shot.doubled === true),
+      reduced ? SHOT_TIMING.reducedEffect : (live ? SHOT_TIMING.effect : SHOT_TIMING.hammer));
     if (live) {
       later(() => {
         for (const hit of shot.hits ?? []) {
@@ -1461,6 +1487,8 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
     const result = pressStep(press, event);
     press = result.state;
     const effect = result.effect;
+    // The hammer sound is the presser's only, and stops at once on fire, cancel or expiry.
+    if (!isPressing(press)) stopHammer();
     if (!isPressing(press) && holdTimer !== null) {
       clearTimeout(holdTimer);
       timers.delete(holdTimer);
@@ -1471,8 +1499,10 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
       // target) and the other screens learn THAT I am pressing (never at whom).
       revolverWrap.classList.add('is-cocking');
       startSpin('local');
+      startHammer();
       sendPress();
     } else if (effect === 'cancel') {
+      stopHammer();
       revolverWrap.classList.remove('is-cocking');
       if (spin?.kind === 'local') stopSpinReset();
       clearMyPress();
@@ -1624,6 +1654,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
     destroy() {
       if (destroyed) return;
       dispatch({ type: 'expire' });
+      stopHammer();
       clearMyPress();
       endSpin();
       destroyed = true;

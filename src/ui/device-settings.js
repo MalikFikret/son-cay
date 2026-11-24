@@ -1,14 +1,18 @@
-// Device settings (Ayarlar, step 4.4a, decisions Q43, Q53, Q55): the revolver, sound and motion,
-// kept on THIS device only (localStorage "sonCay.settings"), never written to the database.
+// Device settings (Ayarlar, steps 4.4a and 4.4c, decisions Q43, Q53, Q55, Q52, Q76, Q77): the
+// revolver, the sound master switch and the five per-sound switches, and motion, kept on THIS
+// device only (localStorage "sonCay.settings"), never written to the database.
 //
-// - Safe defaults: Musul Gravürü, sound on, motion on. Missing, blocked or broken storage, and any
+// - Safe defaults: Musul Gravürü, sound on, every sound on, motion on. Missing, blocked or broken storage, and any
 //   bad value (unknown revolver, a non-boolean switch), fall back to the default for that field;
 //   the other fields keep their stored values. A change still applies for this page when storage
 //   cannot be written.
 // - Changes apply at once: listeners (onSettingsChange) hear every real change, and the motion
 //   switch is mirrored as the class `motion-off` on <html> (applyMotion), which style.css uses
 //   instead of the phone's "reduce motion" setting: animations follow ONLY this switch (Q53).
-// - Sound: only stored for now; the sound step reads it with soundOn().
+// - Sound (step 4.4c, Q77): `sound` is the master switch ("Ses"); `soundEmpty`, `soundLoaded`,
+//   `soundReload`, `soundTurn`, `soundHammer` are the five switches of the "Sesler" group. A
+//   sound plays only while the master AND its own switch are on (soundAllowed); sounds.js
+//   plays them and follows onSettingsChange to silence a sound at once.
 // - Another tab of the same browser that changes a setting is heard through the "storage" event.
 //
 // Pure except for the storage and the root element, both read lazily, so Node tests can run it.
@@ -17,15 +21,26 @@ import { DEFAULT_REVOLVER, isRevolverId } from './revolvers.js';
 
 export const SETTINGS_KEY = 'sonCay.settings';
 
-export const DEFAULT_SETTINGS = Object.freeze({ revolver: DEFAULT_REVOLVER, sound: true, motion: true });
+/** The five sounds (sounds.js), each with its own switch key in the settings. */
+export const SOUND_IDS = Object.freeze(['empty', 'loaded', 'reload', 'turn', 'hammer']);
+export const SOUND_KEYS = Object.freeze({
+  empty: 'soundEmpty', loaded: 'soundLoaded', reload: 'soundReload', turn: 'soundTurn', hammer: 'soundHammer',
+});
+
+export const DEFAULT_SETTINGS = Object.freeze({
+  revolver: DEFAULT_REVOLVER, sound: true, motion: true,
+  soundEmpty: true, soundLoaded: true, soundReload: true, soundTurn: true, soundHammer: true,
+});
 
 /** The class on <html> while Hareketler is off. */
 export const MOTION_OFF_CLASS = 'motion-off';
 
+const isBoolean = (value) => typeof value === 'boolean';
 const VALID = Object.freeze({
   revolver: (value) => isRevolverId(value),
-  sound: (value) => typeof value === 'boolean',
-  motion: (value) => typeof value === 'boolean',
+  sound: isBoolean,
+  motion: isBoolean,
+  ...Object.fromEntries(SOUND_IDS.map((id) => [SOUND_KEYS[id], isBoolean])),
 });
 
 let current = null; // the settings in use (read once, then kept in memory)
@@ -77,8 +92,19 @@ export function getSettings() {
 
 /** The chosen revolver id. */
 export const chosenRevolver = () => getSettings().revolver;
-/** Sound on (the later sound step reads this before playing anything). */
+/** The sound master switch ("Ses"). */
 export const soundOn = () => getSettings().sound;
+
+/**
+ * Whether one sound may play: the master switch and that sound's own switch are both on. An
+ * unknown sound id never plays.
+ * @param {string} id one of SOUND_IDS
+ * @param {object} [settings] defaults to the settings in use
+ */
+export function soundAllowed(id, settings = getSettings()) {
+  if (!Object.prototype.hasOwnProperty.call(SOUND_KEYS, id)) return false;
+  return settings.sound === true && settings[SOUND_KEYS[id]] === true;
+}
 /** Motion on (Hareketler): the full animations; off: the short version. */
 export const motionOn = () => getSettings().motion;
 

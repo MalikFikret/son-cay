@@ -50,3 +50,16 @@ The site is published on GitHub Pages by the GitHub Actions workflow
 `index.html` and `src/` (built and checked by `tools/pages-site.js`). The security rules
 (`database.rules.json`) are uploaded to the Firebase project separately with
 `firebase deploy --only database`.
+
+## Sounds
+
+Two sounds are audio files from [Freesound](https://freesound.org/), both released under
+**CC0** (public domain); the other sounds are synthesized in code (`src/ui/sounds.js`).
+
+- Loaded shot (`src/ui/audio/shot-loaded.mp3`, its first 0.6 s): "Heathers Gunshot Effect2" by
+  okieactor, https://freesound.org/people/okieactor/sounds/415912/ (CC0)
+- Empty shot (`src/ui/audio/shot-empty.mp3`): "Empty Gun Shot" by KlawyKogut,
+  https://freesound.org/people/KlawyKogut/sounds/154934/ (CC0)
+
+`node tools/audio-trim.js` makes both files from the original downloads (kept locally in
+`raw-sounds/`, not in the repository).

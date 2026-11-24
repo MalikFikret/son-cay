@@ -23,6 +23,7 @@ import { DEFAULT_REVOLVER, FLASH, FLASH_ORIGIN, REVOLVERS, SMOKE, isRevolverId }
  * comes the spin's stop (press-signal.js: SPIN_TURN_MS per turn, then SPIN_SETTLE_MS).
  */
 export const SHOT_TIMING = Object.freeze({
+  hammer: 380, // the hammer falls (the Boş click sound, step 4.4c)
   effect: 440, // the hammer has fallen: flash + recoil (Dolu) or click + smoke (Boş) start
   live: 950, // cylinder 360 + hammer at 380 + flash / recoil until ~950
   blank: 1150, // cylinder 360 + hammer at 380 + click, then the smoke 440 + 700

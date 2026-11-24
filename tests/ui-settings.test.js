@@ -44,8 +44,11 @@ afterEach(() => {
 });
 
 describe('device settings', () => {
-  test('defaults: Musul Gravürü, sound on, motion on', () => {
-    assert.deepEqual({ ...DEFAULT_SETTINGS }, { revolver: 'mosul', sound: true, motion: true });
+  test('defaults: Musul Gravürü, sound on, motion on, every sound on', () => {
+    assert.deepEqual({ ...DEFAULT_SETTINGS }, {
+      revolver: 'mosul', sound: true, motion: true,
+      soundEmpty: true, soundLoaded: true, soundReload: true, soundTurn: true, soundHammer: true,
+    });
     globalThis.localStorage = fakeStorage();
     assert.deepEqual({ ...getSettings() }, { ...DEFAULT_SETTINGS });
     assert.equal(chosenRevolver(), 'mosul');
@@ -59,9 +62,9 @@ describe('device settings', () => {
     assert.equal(setSetting('revolver', 'cowboy'), true);
     assert.equal(setSetting('sound', false), true);
     assert.equal(setSetting('motion', false), true);
-    assert.deepEqual(JSON.parse(storage.data.get(SETTINGS_KEY)), { revolver: 'cowboy', sound: false, motion: false });
+    assert.deepEqual(JSON.parse(storage.data.get(SETTINGS_KEY)), { ...DEFAULT_SETTINGS, revolver: 'cowboy', sound: false, motion: false });
     resetSettingsCache(); // a reload
-    assert.deepEqual({ ...getSettings() }, { revolver: 'cowboy', sound: false, motion: false });
+    assert.deepEqual({ ...getSettings() }, { ...DEFAULT_SETTINGS, revolver: 'cowboy', sound: false, motion: false });
     assert.equal(setSetting('revolver', 'cowboy'), false, 'no change');
   });
 

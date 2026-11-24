@@ -970,6 +970,69 @@ a.btn-outline:hover { color: var(--text); background-color: rgba(239, 230, 214, 
 .motion-off .switch-track,
 .motion-off .switch-thumb { transition: none; }
 
+/* Sesler (step 4.4c, Q77): the disclosure row and its compact switches, styled like the rows. */
+.settings-sounds {
+  border-radius: 14px;
+  background-color: var(--surface);
+  border: 1px solid rgba(239, 230, 214, 0.14);
+}
+
+.settings-sounds-toggle {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 44px;
+  margin: 0;
+  padding: 14px 16px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.settings-sounds-chevron {
+  flex: none;
+  width: 48px;
+  display: flex;
+  justify-content: center;
+  color: var(--muted);
+  transition: transform 0.15s ease;
+}
+
+.settings-sounds.is-open .settings-sounds-chevron { transform: rotate(90deg); }
+.motion-off .settings-sounds-chevron { transition: none; }
+
+.settings-sounds-panel {
+  display: flex;
+  flex-direction: column;
+  padding: 0 0 8px;
+  border-top: 1px solid var(--line);
+}
+
+.settings-sounds-panel[hidden],
+.settings-sounds-note[hidden] { display: none; }
+
+.settings-sounds-note {
+  margin: 10px 16px 2px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.settings-row.is-compact {
+  padding: 2px 16px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.settings-row.is-compact .settings-row-label { font-weight: 500; }
+.settings-row.is-disabled .settings-row-label { color: var(--muted); }
+.settings-row.is-disabled .switch { cursor: not-allowed; opacity: 0.45; }
+
 .settings-footer {
   margin: 6px 0 0;
   font-size: 12px;

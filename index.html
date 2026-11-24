@@ -4,7 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <!-- Content-Security-Policy: scripts only from this site and the Firebase CDN, styles and fonts
-     only from this site and Google Fonts. connect-src, by target (src/ui/firebase.js):
+     only from this site and Google Fonts. connect-src: 'self' (the two shot sounds the game
+     fetches from its own src/ui/audio/, sounds.js, decision Q78); then, by target
+     (src/ui/firebase.js):
      - localhost (emulators): http://127.0.0.1:9099 (auth emulator), http://127.0.0.1:9000 and
        ws://127.0.0.1:9000 (database emulator);
      - production (project son-cay), anonymous sign-in of the Firebase JS SDK 13.4.0:
@@ -17,7 +19,7 @@
        https://son-cay-default-rtdb.europe-west1.firebasedatabase.app (the database over HTTPS:
        the SDK's REST client; not used while WebSockets work, listed so it is never blocked).
      Long polling is never used (it would need script-src for the database host). -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://www.gstatic.com; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self'; connect-src http://127.0.0.1:9099 http://127.0.0.1:9000 ws://127.0.0.1:9000 https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://son-cay-default-rtdb.europe-west1.firebasedatabase.app wss://son-cay-default-rtdb.europe-west1.firebasedatabase.app wss://*.europe-west1.firebasedatabase.app; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://www.gstatic.com; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self'; connect-src 'self' http://127.0.0.1:9099 http://127.0.0.1:9000 ws://127.0.0.1:9000 https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://son-cay-default-rtdb.europe-west1.firebasedatabase.app wss://son-cay-default-rtdb.europe-west1.firebasedatabase.app wss://*.europe-west1.firebasedatabase.app; base-uri 'none'; form-action 'none'">
 <!-- Referrer: "strict-origin" sends only the origin (https://malikfikret.github.io), never the
      path or the #/masa/CODE hash, and nothing over plain HTTP. The real API key is restricted to
      this website in Google Cloud, so anonymous sign-in (identitytoolkit / securetoken) is refused

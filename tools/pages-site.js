@@ -7,7 +7,7 @@
 // exactly index.html + src/, nothing else: never dev/, tests/, tests-firebase/, tools/, docs/,
 // node_modules/, database.rules.json, firebase.json, package files, CLAUDE.md or any .env.
 // The check after the copy fails (exit code 1) if anything else is in the folder, if a forbidden
-// name appears anywhere in it, or if a file under src/ is not a .js, .css or .svg file.
+// name appears anywhere in it, or if a file under src/ is not a .js, .css, .svg or .mp3 file.
 
 import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -25,7 +25,7 @@ export const FORBIDDEN = Object.freeze([
   'CLAUDE.md', 'README.md', '.firebaserc', '.gitignore', '.gitattributes',
 ]);
 
-const ALLOWED_IN_SRC = /\.(js|css|svg)$/;
+const ALLOWED_IN_SRC = /\.(js|css|svg|mp3)$/; // mp3: the shot sounds in src/ui/audio/ (Q78)
 
 function walk(dir) {
   const out = [];

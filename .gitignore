@@ -12,5 +12,8 @@ ui-debug.log
 *-debug.log
 .firebase/
 
+# Raw sound downloads (CC0, Freesound); only the trimmed src/ui/audio/ files are committed
+raw-sounds/
+
 # GitHub Pages build output (node tools/pages-site.js)
 _site/

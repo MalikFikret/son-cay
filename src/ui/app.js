@@ -23,6 +23,7 @@ import { aboutScreen } from './screens/about.js';
 import { howToScreen } from './screens/howto.js';
 import { settingsScreen } from './screens/settings.js';
 import { initDeviceSettings } from './device-settings.js';
+import { initSounds } from './sounds.js';
 import { ROOM_CLOSED_MS, closedScreen } from './screens/closed.js';
 import { homeScreen } from './screens/home.js';
 import { problemScreen } from './screens/problem.js';
@@ -322,6 +323,8 @@ async function start() {
   initLanguage();
   // This device's settings (step 4.4a): the motion class on <html> before anything is drawn.
   initDeviceSettings();
+  // The sounds (step 4.4c): the audio starts on the first tap, and follows the switches.
+  initSounds();
   showLoading(t('app.connecting'));
   try {
     Object.assign(ctx, await connect());
