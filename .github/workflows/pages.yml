@@ -60,6 +60,8 @@ jobs:
           for name in database.rules.json firebase.json package.json package-lock.json CLAUDE.md '.env*'; do
             if [ -n "$(find _site -name "$name")" ]; then echo "::error::$name found in the site"; exit 1; fi
           done
+          # Every same-site URL carries the commit (tools/pages-site.js): no old / new module mix.
+          grep -q 'src/ui/app.js?v=' _site/index.html || { echo "::error::index.html is not version-stamped"; exit 1; }
 
       - name: Upload the site
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0

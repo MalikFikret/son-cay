@@ -127,7 +127,8 @@ describe('the real Firebase web config', () => {
   // Patterns, not values: this test must not contain the config itself.
   const API_KEY = /AIza[0-9A-Za-z_-]{30,}/;
   const APP_ID = /\d+:\d{6,}:web:[0-9a-f]+/;
-  const SKIP = new Set(['node_modules', '.git', 'docs', '.firebase', '.claude']);
+  // _site: the git-ignored Pages build, a copy of src/ (tools/pages-site.js), not a second place.
+  const SKIP = new Set(['node_modules', '.git', 'docs', '.firebase', '.claude', '_site']);
   function repoFiles(dir = root) {
     const files = [];
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
