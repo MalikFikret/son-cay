@@ -53,6 +53,7 @@ export default Object.freeze({
     titleRecover: 'reclaim your seat',
     titleAbout: 'about',
     titleHowTo: 'how to play',
+    titleSettings: 'settings',
     connecting: 'Connecting…',
     retry: 'Try again',
   },
@@ -618,5 +619,39 @@ export default Object.freeze({
     legendAnytime: "Usable even when it isn't your turn; used on someone else's turn, it doesn't count toward the turn limit.",
     turnToolsTitle: 'On your turn',
     anytimeToolsTitle: 'Any time',
+  },
+
+  // Settings (step 4.4a, decisions Q43, Q53, Q55). The page title is common.settings.
+  deviceSettings: {
+    revolverTitle: 'Revolver',
+    revolverNote: 'Only you see it at the table.',
+    revolverGroup: 'Choose your revolver',
+    defaultNote: (note) => `${note} · default`,
+    gameTitle: 'Game',
+    sound: 'Sound',
+    soundHelp: 'Bullet, reload and turn sounds.',
+    motion: 'Motion',
+    motionHelp: "The revolver's turn, recoil and shake. When off, the screen changes with simple transitions.",
+    footer: 'These settings are saved on this device only.',
+  },
+
+  // The six revolvers, keyed by revolver id.
+  revolvers: {
+    names: {
+      birdHead: "Bird's Head",
+      cowboy: 'Cowboy',
+      detective: 'Detective',
+      heavy: 'Heavy Calibre',
+      oldSoldier: 'Old Soldier',
+      mosul: 'Mosul Engraving',
+    },
+    notes: {
+      birdHead: 'curved grip',
+      cowboy: 'long barrel',
+      detective: 'short barrel',
+      heavy: 'heavy barrel',
+      oldSoldier: 'ring grip',
+      mosul: 'bone grip',
+    },
   },
 });

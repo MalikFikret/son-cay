@@ -145,13 +145,11 @@ describe('the Kurallar tab', () => {
 });
 
 describe('opening and closing (source checks)', () => {
-  test('Giriş and the match ⋮ menu open the page; "Ayarlar" stays disabled', () => {
+  test('Giriş and the match ⋮ menu open the page', () => {
     const home = read('src/ui/screens/home.js');
     assert.match(home, /ctx\.go\(hashFor\.howTo\(\)\)/);
-    assert.match(home, /disabled: true, title: t\('common\.soon'\) \}, icon\('gear'\)/);
     const table = read('src/ui/screens/table.js');
     assert.match(table, /menuItem\(t\('common\.howToPlay'\), \{ onClick:/);
-    assert.match(table, /menuItem\(t\('common\.settings'\), \{ disabled: true \}\)/);
     assert.match(read('src/ui/screens/lobby.js'), /onHowTo: \(\) => ctx\.go\(hashFor\.howTo\(\)\)/);
   });
 

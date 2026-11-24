@@ -70,6 +70,7 @@ import {
   withdrawAction,
 } from '../ransom-model.js';
 import { revolverSvg, SHOT_TIMING } from '../revolver.js';
+import { chosenRevolver, motionOn, onSettingsChange } from '../device-settings.js';
 import { LONG_PRESS_MS, PRESS, initialPress, isPressing, pressStep } from '../fire-press.js';
 import {
   STAGE_WIDTH,
@@ -106,7 +107,9 @@ const END_HOLD_MS = 1600; // the final table stays this long before the end scre
 const ERROR_SHOW_MS = 6000;
 const RING = 2 * Math.PI * 22; // countdown ring circumference (r = 22)
 
-const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+// Hareketler off (decision Q53): the short animations. Only this device's switch counts, never
+// the phone's "reduce motion" setting.
+const reducedMotion = () => !motionOn();
 
 /**
  * @param {{ api: object, uid: string, code: string, mode: string, mySeat: string,
@@ -117,10 +120,11 @@ const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(pre
  *   onCloseRoom: the host confirmed "Masayı kapat" (decision Q67; shown to the host only, enabled
  *   during a match only while every other seat is absent: setRoom's closeRoom state);
  *   onHome: "⋮ > Ana sayfa" (decision Q70): go to Giriş, keeping the seat;
- *   onHowTo: "⋮ > Nasıl oynanır" (decision Q73): open that page, keeping the seat
+ *   onHowTo: "⋮ > Nasıl oynanır" (decision Q73): open that page, keeping the seat;
+ *   onSettings: "⋮ > Ayarlar" (step 4.4a): open that page, keeping the seat
  * @returns {{ el: HTMLElement, setRoom(room: object): void, isEnded(): boolean, destroy(): void }}
  */
-export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, onLost, onBack, onCloseRoom, onHome, onHowTo }) {
+export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, onLost, onBack, onCloseRoom, onHome, onHowTo, onSettings }) {
   let destroyed = false;
   const stops = [];
   const timers = new Set();
@@ -159,8 +163,8 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
   // --- Static parts --------------------------------------------------------------------------
   // "⋮" (decision Q70): an in-page menu with "Ana sayfa" (navigation only: the seat, presence
   // and the match are untouched), "Dil / Language" (decision Q71: switches to the next language
-  // on this device; the screen is drawn again, the seat, turn and timer go on), "Nasıl oynanır"
-  // (decision Q73: navigation only, like "Ana sayfa") and the not yet built "Ayarlar".
+  // on this device; the screen is drawn again, the seat, turn and timer go on), "Ayarlar" (step
+  // 4.4a) and "Nasıl oynanır" (decision Q73), both navigation only, like "Ana sayfa".
   const menuButton = h('button', {
     type: 'button', class: 'table-top-button is-square table-menu-button', 'aria-label': t('away.tableMenu'),
     'aria-haspopup': 'menu', 'aria-expanded': 'false', 'aria-controls': 'table-menu',
@@ -179,7 +183,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
       hintLang: nextLanguage(),
       onClick: () => { closeMenu(); setLanguage(nextLanguage()); },
     }),
-    menuItem(t('common.settings'), { disabled: true }),
+    menuItem(t('common.settings'), { onClick: () => { closeMenu(); if (onSettings) onSettings(); } }),
     menuItem(t('common.howToPlay'), { onClick: () => { closeMenu(); if (onHowTo) onHowTo(); } }));
   const menuWrap = h('div', { class: 'table-menu-wrap' }, menuButton, menu);
 
@@ -231,7 +235,11 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
   const disc = h('div', { class: 'table-disc', 'aria-hidden': 'true' });
   const decor = svg(DECOR);
   const arrows = svg(['svg', { class: 'table-arrows', role: 'img', preserveAspectRatio: 'none' }]);
-  const revolverWrap = h('div', { class: 'revolver', role: 'img' }, revolverSvg());
+  // This device's own revolver (Ayarlar); a change while the table is shown swaps the drawing.
+  const revolverWrap = h('div', { class: 'revolver', role: 'img' }, revolverSvg(chosenRevolver()));
+  stops.push(onSettingsChange((settings, before) => {
+    if (settings.revolver !== before.revolver) revolverWrap.replaceChildren(revolverSvg(settings.revolver));
+  }));
   const reloadLive = h('span', { class: 'reload-live' });
   const reloadBlank = h('span', { class: 'reload-blank' });
   const reloadSr = h('span', { class: 'visually-hidden' });

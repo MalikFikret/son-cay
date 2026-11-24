@@ -1,5 +1,5 @@
 // Giriş: the TR / EN switch, the table code and "Masaya katıl", "Yeni masa kur", "Nasıl oynanır"
-// (decision Q73), the (not yet built) "Ayarlar", the copyright line and the "Hakkında" link.
+// (decision Q73), "Ayarlar" (step 4.4a), the copyright line and the "Hakkında" link.
 
 import { h } from '../dom.js';
 import { errorLine, icon, languageSwitch, markInvalid, screen, whileBusy } from '../components.js';
@@ -103,7 +103,7 @@ export function homeScreen(ctx, view, { message, info = false } = {}) {
     h('button', { type: 'button', class: 'btn btn-outline', text: t('home.create'), on: { click: onCreate } }),
     h('div', { class: 'tile-row' },
       h('button', { type: 'button', class: 'btn-tile', on: { click: () => ctx.go(hashFor.howTo()) } }, icon('book'), t('common.howToPlay')),
-      h('button', { type: 'button', class: 'btn-tile', disabled: true, title: t('common.soon') }, icon('gear'), t('common.settings'))),
+      h('button', { type: 'button', class: 'btn-tile', on: { click: () => ctx.go(hashFor.settings()) } }, icon('gear'), t('common.settings'))),
     h('p', { class: 'small-note', text: t('home.note') }),
     h('div', { class: 'footer' },
       h('span', { text: t('common.copyright') }),

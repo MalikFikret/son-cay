@@ -24,14 +24,14 @@ const EXAMPLE_LIVE = 3; // the Tur badge of the mock: "3 dolu · 2 boş"
 const EXAMPLE_BLANK = 2;
 
 /**
- * @param {object} ctx { keeper, howToBack(), ... }
+ * @param {object} ctx { keeper, pageBack(), ... }
  * @param {object} view { active(), onLeave(fn) }
  * @param {{ tab: string }} params
  */
 export function howToScreen(ctx, view, { tab = HOW_TO_TABS.RULES } = {}) {
   const held = ctx.keeper?.current() ?? null;
   const bar = held ? createHomeBar(ctx, view, held) : null;
-  const top = header({ title: t('common.howToPlay'), subtitle: t('app.name'), onBack: () => ctx.howToBack() });
+  const top = header({ title: t('common.howToPlay'), subtitle: t('app.name'), onBack: () => ctx.pageBack() });
 
   let current = TAB_ORDER.includes(tab) ? tab : HOW_TO_TABS.RULES;
   const panel = h('div', { class: 'howto-panel', role: 'tabpanel', id: 'howto-panel', tabindex: '-1' });

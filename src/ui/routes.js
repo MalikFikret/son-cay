@@ -6,6 +6,7 @@
 //   #/hakkinda            Hakkında (about)
 //   #/nasil               Nasıl oynanır, tab Kurallar (how to play, decision Q73)
 //   #/nasil/malzemeler    Nasıl oynanır, tab Malzemeler
+//   #/ayarlar             Ayarlar (device settings, step 4.4a)
 //   #/masa/CODE           the table: the seat screen for a member, else "Masaya otur" (join).
 //                         This is also the invite link.
 //   #/masa/CODE/don       Yerine dön (recover my seat)
@@ -19,6 +20,7 @@ export const ROUTES = Object.freeze({
   CREATE: 'create',
   ABOUT: 'about',
   HOW_TO: 'howTo',
+  SETTINGS: 'settings',
   TABLE: 'table',
   RECOVER: 'recover',
   /** A hash that names a table with an invalid code (e.g. a mangled invite link). */
@@ -39,6 +41,7 @@ export const hashFor = Object.freeze({
   home: () => '#/',
   create: () => '#/yeni',
   about: () => '#/hakkinda',
+  settings: () => '#/ayarlar',
   howTo: (tab = HOW_TO_TABS.RULES) => (tab === HOW_TO_TABS.TOOLS ? `#/${HOW_TO_SEGMENT}/${TOOLS_SEGMENT}` : `#/${HOW_TO_SEGMENT}`),
   table: (code) => `#/masa/${checkedCode(code)}`,
   recover: (code) => `#/masa/${checkedCode(code)}/${RECOVER_SEGMENT}`,
@@ -75,6 +78,7 @@ export function parseRoute(hash) {
 
   if (parts.length === 1 && parts[0] === 'yeni') return { name: ROUTES.CREATE };
   if (parts.length === 1 && parts[0] === 'hakkinda') return { name: ROUTES.ABOUT };
+  if (parts.length === 1 && parts[0] === 'ayarlar') return { name: ROUTES.SETTINGS };
   if (parts[0] === HOW_TO_SEGMENT && parts.length === 1) return { name: ROUTES.HOW_TO, tab: HOW_TO_TABS.RULES };
   if (parts[0] === HOW_TO_SEGMENT && parts.length === 2 && parts[1] === TOOLS_SEGMENT) {
     return { name: ROUTES.HOW_TO, tab: HOW_TO_TABS.TOOLS };

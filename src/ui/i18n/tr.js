@@ -29,6 +29,7 @@ export default Object.freeze({
     titleRecover: 'yerine dön',
     titleAbout: 'hakkında',
     titleHowTo: 'nasıl oynanır',
+    titleSettings: 'ayarlar',
     connecting: 'Bağlanıyor…',
     retry: 'Tekrar dene',
   },
@@ -598,5 +599,41 @@ export default Object.freeze({
     legendAnytime: 'Sıran olmasa da kullanılır; başkasının sırasında kullanırsan sıra sınırından düşmez.',
     turnToolsTitle: 'Sıranda',
     anytimeToolsTitle: 'Her an',
+  },
+
+  // Ayarlar (step 4.4a, decisions Q43, Q53, Q55; approved mock: conversation 11, model 3, without
+  // the "Ateşlemeden önce sor" switch). The page title is common.settings.
+  deviceSettings: {
+    revolverTitle: 'Tabanca',
+    revolverNote: 'Masada yalnız sen görürsün.',
+    revolverGroup: 'Tabanca seçimi',
+    defaultNote: (note) => `${note} · varsayılan`,
+    gameTitle: 'Oyun',
+    sound: 'Ses',
+    soundHelp: 'Mermi, dolum ve sıra sesleri.',
+    motion: 'Hareketler',
+    motionHelp: 'Tabancanın dönüşü, geri tepme ve sarsıntı. Kapalıysa ekran sade geçişlerle değişir.',
+    footer: 'Bu ayarlar yalnız bu cihazda saklanır.',
+  },
+
+  // The six revolvers (decision Q43; names and notes from the approved mocks: conversation 8
+  // model 2, conversation 11 model 3), keyed by revolver id.
+  revolvers: {
+    names: {
+      birdHead: 'Kuş Başı',
+      cowboy: 'Kovboy',
+      detective: 'Dedektif',
+      heavy: 'Ağır Kalibre',
+      oldSoldier: 'Eski Asker',
+      mosul: 'Musul Gravürü',
+    },
+    notes: {
+      birdHead: 'kıvrık kabza',
+      cowboy: 'uzun namlu',
+      detective: 'kısa namlu',
+      heavy: 'ağır namlu',
+      oldSoldier: 'halkalı kabza',
+      mosul: 'kemik kabza',
+    },
   },
 });

@@ -45,9 +45,9 @@ describe('game UI sources', () => {
     }
   });
 
-  test('only memory.js (the table code) and i18n/i18n.js (the language) touch browser storage', () => {
+  test('only memory.js (the table code), i18n/i18n.js (the language) and device-settings.js (Ayarlar) touch browser storage', () => {
     for (const { name, text } of sources) {
-      if (name === 'memory.js' || name === 'i18n/i18n.js') continue;
+      if (name === 'memory.js' || name === 'i18n/i18n.js' || name === 'device-settings.js') continue;
       assert.doesNotMatch(text, /\b(localStorage|sessionStorage|indexedDB|document\.cookie)\b/, name);
     }
     const memory = sources.find((s) => s.name === 'memory.js').text;
@@ -58,6 +58,11 @@ describe('game UI sources', () => {
     assert.equal([...i18n.matchAll(/setItem\(/g)].length, 1);
     assert.match(i18n, /localStorage\?\.setItem\(STORAGE_KEY, lang\)/);
     assert.doesNotMatch(i18n, /\b(sessionStorage|indexedDB|document\.cookie)\b/);
+    // The device settings (step 4.4a): one localStorage entry, nothing else.
+    const settings = sources.find((s) => s.name === 'device-settings.js').text;
+    assert.equal([...settings.matchAll(/setItem\(/g)].length, 1);
+    assert.match(settings, /setItem\(SETTINGS_KEY, JSON\.stringify\(current\)\)/);
+    assert.doesNotMatch(settings, /\b(sessionStorage|indexedDB|document\.cookie)\b/);
   });
 });
 
