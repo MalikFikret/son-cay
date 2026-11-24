@@ -13,6 +13,7 @@ export default Object.freeze({
   meta: {
     language: 'tr',
     languageName: 'Türkçe',
+    shortName: 'TR',
     description: 'Son Çay: arkadaşlarınla çevrimiçi oynanan bir taktik ve biraz da şans oyunu.',
   },
 
@@ -47,6 +48,7 @@ export default Object.freeze({
     tableCodeLabel: 'Masa kodu',
     teaGlass: 'Çay bardağı',
     copyright: '© 2026 Malik Fikret. Tüm hakları saklıdır.',
+    language: 'Dil',
     andList: (items) => items.join(' ve '),
   },
 
@@ -352,6 +354,8 @@ export default Object.freeze({
   away: {
     tableMenu: 'Menü',
     menuHome: 'Ana sayfa',
+    // Both languages on purpose: findable whatever the current language is.
+    menuLanguage: 'Dil / Language',
     backToYourTableFirst: 'Önce masana dön.',
     homeBarTable: (code) => `Masa ${code}`,
     homeBarBack: (code) => `Masaya dön · Masa ${code}`,
@@ -435,7 +439,8 @@ export default Object.freeze({
     probeLast: ' · bu son mermi, sonrası yok',
     same: 'aynı',
     different: 'farklı',
-    counterResult: (examined) => (examined === 3 ? ' · şu anki ve sonraki 2 mermide ' : ` · kalan ${examined} mermide `),
+    // "{b}" marks where the bold count goes (splitBold in i18n.js); Turkish puts it last.
+    counterResult: (examined) => (examined === 3 ? ' · şu anki ve sonraki 2 mermide {b}' : ` · kalan ${examined} mermide {b}`),
     liveCount: (count) => `${count} Dolu`,
     flipResult: ' · şu anki mermi ',
     flipped: 'ters çalışacak',

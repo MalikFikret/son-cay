@@ -13,7 +13,8 @@ import { toolName } from './tools.js';
 
 export const TOOL_NOTICE_MS = 3000;
 
-// The scope line from the strip's text (" · şu anki mermi " -> "şu anki mermi").
+// The scope line from the strip's text (" · şu anki mermi " -> "şu anki mermi"; English " ·  in the
+// last 2 bullets" -> "in the last 2 bullets").
 const scopeOf = (text) => text.replace(/^\s*·\s*/, '').trim();
 
 /**
@@ -32,7 +33,8 @@ export function toolNotice(events, viewerId) {
     tool: result.tool,
     name: toolName(result.tool),
     word: last ? t('toolNotice.toolNoticeLast') : text.strong,
-    scope: scopeOf(text.text),
+    // The scope is the result line without the bold word, on whichever side of it it stands.
+    scope: scopeOf(`${text.text}${text.after}`),
     durationMs: TOOL_NOTICE_MS,
   };
 }

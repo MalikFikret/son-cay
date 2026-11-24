@@ -1,8 +1,8 @@
-// Giriş: the table code and "Masaya katıl", "Yeni masa kur", the (not yet built) "Nasıl oynanır"
+// Giriş: the TR / EN switch, the table code and "Masaya katıl", "Yeni masa kur", the (not yet built) "Nasıl oynanır"
 // and "Ayarlar", the copyright line and the "Hakkında" link.
 
 import { h } from '../dom.js';
-import { errorLine, icon, markInvalid, screen, whileBusy } from '../components.js';
+import { errorLine, icon, languageSwitch, markInvalid, screen, whileBusy } from '../components.js';
 import { errorMessage } from '../messages.js';
 import { t } from '../i18n/i18n.js';
 import { codeFromText, hashFor } from '../routes.js';
@@ -112,6 +112,8 @@ export function homeScreen(ctx, view, { message, info = false } = {}) {
 
   return screen('screen-home',
     bar,
+    // The TR / EN switch in the top corner (decision Q71), over the brand's top space.
+    h('div', { class: 'home-top' }, languageSwitch({ compact: true })),
     h('div', { class: 'brand' },
       icon('glass'),
       h('h1', { class: 'brand-title', text: t('app.name') }),

@@ -3,7 +3,7 @@
 
 import { NAME_MAX } from '../rooms/index.js';
 import { h, svg } from './dom.js';
-import { hasText, t } from './i18n/i18n.js';
+import { LANGUAGES, getLanguage, hasText, languageName, setLanguage, t } from './i18n/i18n.js';
 
 export const ICONS = Object.freeze({
   back: ['svg', { width: 18, height: 18, viewBox: '0 0 18 18', 'aria-hidden': 'true' },
@@ -148,6 +148,26 @@ export async function whileBusy(button, busyText, task) {
     button.textContent = label;
     button.disabled = false;
   }
+}
+
+/**
+ * The language switch (decision Q71): one button per language, each named in its own language
+ * ("Türkçe" / "English"; `compact`: "TR" / "EN" with the full name as its label), the current one
+ * highlighted. A tap calls setLanguage(); app.js then draws the current screen again. Nothing is
+ * written to the database.
+ */
+export function languageSwitch({ compact = false } = {}) {
+  const current = getLanguage();
+  return h('div', { class: compact ? 'lang-switch is-compact' : 'lang-switch', role: 'group', 'aria-label': t('common.language') },
+    LANGUAGES.map((lang) => h('button', {
+      type: 'button',
+      class: lang === current ? 'lang-option is-current' : 'lang-option',
+      lang,
+      'aria-pressed': String(lang === current),
+      'aria-label': compact ? languageName(lang) : null,
+      text: languageName(lang, { short: compact }),
+      on: { click: () => { if (lang !== getLanguage()) setLanguage(lang); } },
+    })));
 }
 
 /** A short centered "loading" placeholder for screens that read before they can draw. */

@@ -1,8 +1,9 @@
 // Hakkında: description, version (VERSION only, from the generated src/ui/version.js; the
-// stamped commit is not shown), developer, language, contact, privacy and copyright.
+// stamped commit is not shown), developer, the language switch (decision Q71), contact, privacy
+// and copyright.
 
 import { h } from '../dom.js';
-import { header, screen } from '../components.js';
+import { header, languageSwitch, screen } from '../components.js';
 import { hashFor } from '../routes.js';
 import { VERSION } from '../version.js';
 import { t } from '../i18n/i18n.js';
@@ -27,7 +28,7 @@ export function aboutScreen(ctx) {
       h('dl', { class: 'facts' },
         h('dt', { text: t('about.version') }), h('dd', { text: VERSION }),
         h('dt', { text: t('about.developer') }), h('dd', { class: 'strong', text: t('about.developerName') }),
-        h('dt', { text: t('about.language') }), h('dd', { text: t('meta.languageName') })),
+        h('dt', { class: 'facts-center', text: t('about.language') }), h('dd', {}, languageSwitch())),
       h('section', { class: 'about-section' },
         h('h2', { class: 'section-title', text: t('about.contact') }),
         CONTACTS.map((c) => h('a', { class: 'contact', href: c.href, ...external(c.href) },

@@ -9,7 +9,7 @@
 // device only inside the tool action itself, like the shot.
 
 import { TOOL_INFO } from '../engine/index.js';
-import { t } from './i18n/i18n.js';
+import { splitBold, t } from './i18n/i18n.js';
 import { isTool, toolName } from './tools.js';
 
 const isAnytime = (tool) => TOOL_INFO[tool]?.timing === 'anytime';
@@ -272,8 +272,11 @@ export function resultText(item) {
     case 'probe':
       if (item.result === 'noNext') return { name, text: t('tableTools.probeLast'), strong: '', after: '' };
       return { name, text: t('tableTools.probeResult'), strong: item.result === 'same' ? t('tableTools.same') : t('tableTools.different'), after: '' };
-    case 'counter':
-      return { name, text: t('tableTools.counterResult', item.examined), strong: t('tableTools.liveCount', item.live), after: '' };
+    case 'counter': {
+      // The count's place differs by language ("{b}" slot): Turkish last, English first.
+      const [text, after] = splitBold(t('tableTools.counterResult', item.examined));
+      return { name, text, strong: t('tableTools.liveCount', item.live), after };
+    }
     case 'flip':
       return { name, text: t('tableTools.flipResult'), strong: item.flipped ? t('tableTools.flipped') : t('tableTools.notFlipped'), after: '' };
     case 'shotShield':

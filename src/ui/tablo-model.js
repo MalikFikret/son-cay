@@ -16,11 +16,12 @@ export function formatSigned(points) {
   return '0';
 }
 
+// Locale keys, read when shown (a text read at import would stay in the first language).
 const SHOT_LABELS = Object.freeze({
-  liveOnOther: t('tablo.lineLiveOnOther'),
-  blankOnOther: t('tablo.lineBlankOnOther'),
-  blankOnSelf: t('tablo.lineBlankOnSelf'),
-  liveOnSelf: t('tablo.lineLiveOnSelf'),
+  liveOnOther: 'tablo.lineLiveOnOther',
+  blankOnOther: 'tablo.lineBlankOnOther',
+  blankOnSelf: 'tablo.lineBlankOnSelf',
+  liveOnSelf: 'tablo.lineLiveOnSelf',
 });
 
 /** The status line under a name: "Kazandı", "N. turda çıktı", ... */
@@ -40,7 +41,7 @@ export function statusText(row, result) {
 export function breakdownLines(row, mode) {
   const b = row.breakdown;
   const times = (count) => (count > 0 ? t('tablo.times', count) : '—');
-  const lines = SHOT_KINDS.map((kind) => ({ label: SHOT_LABELS[kind], count: times(b[kind].count), points: formatSigned(b[kind].points) }));
+  const lines = SHOT_KINDS.map((kind) => ({ label: t(SHOT_LABELS[kind]), count: times(b[kind].count), points: formatSigned(b[kind].points) }));
   lines.push({ label: t('tablo.lineEliminations'), count: times(b.eliminations.count), points: formatSigned(b.eliminations.points) });
   lines.push({ label: t('tablo.lineRounds', b.rounds.count), count: '', points: formatSigned(b.rounds.points) });
   lines.push({ label: t('tablo.lineWin'), count: '—', points: b.win.points === 0 ? '—' : formatSigned(b.win.points) });

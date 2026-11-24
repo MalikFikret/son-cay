@@ -34,7 +34,7 @@ import { createCloseRoom } from '../close-room.js';
 import { shotNotice } from '../shot-notice.js';
 import { toolNotice } from '../tool-notice.js';
 import { errorMessage } from '../messages.js';
-import { t } from '../i18n/i18n.js';
+import { languageName, nextLanguage, setLanguage, t } from '../i18n/i18n.js';
 import { createSheet } from '../sheet.js';
 import { createTablo } from '../tablo.js';
 import { formatSigned, liveMatchView } from '../tablo-model.js';
@@ -157,17 +157,27 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
 
   // --- Static parts --------------------------------------------------------------------------
   // "⋮" (decision Q70): an in-page menu with "Ana sayfa" (navigation only: the seat, presence
-  // and the match are untouched) and the not yet built "Ayarlar" / "Nasıl oynanır".
+  // and the match are untouched), "Dil / Language" (decision Q71: switches to the next language
+  // on this device; the screen is drawn again, the seat, turn and timer go on) and the not yet
+  // built "Ayarlar" / "Nasıl oynanır".
   const menuButton = h('button', {
     type: 'button', class: 'table-top-button is-square table-menu-button', 'aria-label': t('away.tableMenu'),
     'aria-haspopup': 'menu', 'aria-expanded': 'false', 'aria-controls': 'table-menu',
   }, svg(DOTS_VERTICAL));
-  const menuItem = (text, { onClick, disabled = false } = {}) => h('button', {
+  const menuItem = (text, { onClick, disabled = false, hint = null, hintLang = null } = {}) => h('button', {
     type: 'button', class: 'table-menu-item', role: 'menuitem', disabled, title: disabled ? t('common.soon') : null,
     on: onClick ? { click: onClick } : undefined,
-  }, h('span', { text }), disabled ? h('span', { class: 'hint', text: t('common.soon') }) : null);
+  }, h('span', { text }),
+  disabled ? h('span', { class: 'hint', text: t('common.soon') }) : null,
+  hint ? h('span', { class: 'hint', lang: hintLang, text: hint }) : null);
   const menu = h('div', { class: 'table-menu', id: 'table-menu', role: 'menu', 'aria-label': t('away.tableMenu'), hidden: true },
     menuItem(t('away.menuHome'), { onClick: () => { closeMenu(); if (onHome) onHome(); } }),
+    // The hint names the language a tap switches to, in that language.
+    menuItem(t('away.menuLanguage'), {
+      hint: languageName(nextLanguage()),
+      hintLang: nextLanguage(),
+      onClick: () => { closeMenu(); setLanguage(nextLanguage()); },
+    }),
     menuItem(t('common.settings'), { disabled: true }),
     menuItem(t('common.howToPlay'), { disabled: true }));
   const menuWrap = h('div', { class: 'table-menu-wrap' }, menuButton, menu);

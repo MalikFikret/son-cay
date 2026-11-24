@@ -3,8 +3,8 @@
 // Language is per device: it is chosen here, stored on the device (localStorage) and never
 // written to the database (the engine and the room layer only hold ids and numbers).
 // - Choice: a stored language if it exists; else "en" when nothing is stored and the browser's
-//   language starts with "en"; else Turkish. A language without a locale (for now everything but
-//   "tr") falls back to Turkish, and so does any key missing from a locale.
+//   language starts with "en"; else Turkish. A language without a locale falls back to Turkish,
+//   and so does any key missing from a locale (the tests require every key in both locales).
 // - <html lang> follows the current language; setLanguage() tells the listeners (app.js draws the
 //   current screen again).
 // - Locale-aware casing / number formatting use the current language (Turkish İ / ı).
@@ -12,6 +12,7 @@
 // Pure apart from the optional browser globals (document, localStorage, navigator), each used
 // inside try/catch so the module also loads in Node (tests) and in private windows.
 
+import en from './en.js';
 import tr from './tr.js';
 
 export const DEFAULT_LANGUAGE = 'tr';
@@ -25,8 +26,8 @@ function deepFreeze(value) {
   return value;
 }
 
-/** language -> locale. Only Turkish exists for now; English comes in the next step. */
-export const LOCALES = deepFreeze({ tr });
+/** language -> locale, in the order the switchers show them. */
+export const LOCALES = deepFreeze({ tr, en });
 export const LANGUAGES = Object.freeze(Object.keys(LOCALES));
 
 const hasOwn = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
@@ -87,6 +88,32 @@ export function t(key, ...params) {
   if (typeof entry === 'function') return String(entry(...params));
   if (typeof entry === 'string') return entry;
   return String(key);
+}
+
+/**
+ * A language's own name, always in that language, for the switchers: "Türkçe" / "English", or
+ * with `short` "TR" / "EN".
+ */
+export function languageName(lang, { short = false } = {}) {
+  const name = lookup(short ? 'meta.shortName' : 'meta.languageName', resolveLanguage(lang));
+  return typeof name === 'string' ? name : String(lang);
+}
+
+/** The language after the current one, in LANGUAGES order (the ⋮ menu's switch). */
+export function nextLanguage() {
+  return LANGUAGES[(LANGUAGES.indexOf(current) + 1) % LANGUAGES.length];
+}
+
+/** The marker a text puts where its bold word goes (e.g. tableTools.counterResult). */
+export const BOLD_SLOT = '{b}';
+
+/**
+ * Splits a text at its bold slot: [before, after]. Each language orders its own parts; the
+ * screen puts the bold word (an element) between them. A text without the slot is all "before".
+ */
+export function splitBold(text) {
+  const at = text.indexOf(BOLD_SLOT);
+  return at === -1 ? [text, ''] : [text.slice(0, at), text.slice(at + BOLD_SLOT.length)];
 }
 
 export function getLanguage() {

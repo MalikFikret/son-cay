@@ -1,0 +1,571 @@
+// English (en): the same keys and the same kind of entry (string, or function with the same
+// parameters) as tr.js; tests/ui-i18n.test.js checks both ways. The approved terms (decision
+// Q72) live here: table, Table code, Lobby, host, PIN, turn, round, match, Session, Scoreboard,
+// lives / tea glasses, revolver, bullet (never "round" for a bullet), Loaded / Empty, Fire,
+// target, item, Loot, Ransom, Classic / Custom, shop / gold, offline, Spectating, Elimination /
+// Prediction; Join table, New table, Take a seat, Reclaim your seat, How to play, About, Start
+// match, Delete table, Back to lobby, Back to table, Home; the item names (Eye, Scales, ...).
+// The game name stays "Son Çay".
+//
+// Names go straight into English sentences. A function returns plain text; the screens insert
+// names with textContent, never as markup. "{b}" in counterResult marks where the bold word
+// goes (see splitBold in i18n.js).
+
+const COPY_FAILED = "Couldn't copy. Select the link and copy it by hand.";
+const GENERIC = 'Something went wrong. Reload the page and try again.';
+const OFFLINE = "Can't reach the server. Check your internet connection.";
+
+/** "1 player" / "2 players". */
+const plural = (count, one, many) => `${count} ${count === 1 ? one : many}`;
+
+/** 1st, 2nd, 3rd, 4th, 11th, 12th, 13th, 21st, ... */
+function ordinal(n) {
+  const tens = n % 100;
+  if (tens >= 11 && tens <= 13) return `${n}th`;
+  const suffix = { 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] ?? 'th';
+  return `${n}${suffix}`;
+}
+
+/** "Ada", "Ada and Bora", "Ada, Bora and Cem". */
+function andList(items) {
+  if (items.length <= 2) return items.join(' and ');
+  return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+}
+
+export default Object.freeze({
+  // The language itself (About "Language", <html lang>, the page description).
+  meta: {
+    language: 'en',
+    languageName: 'English',
+    shortName: 'EN',
+    description: 'Son Çay: a game of tactics, and a little luck, to play online with your friends.',
+  },
+
+  // The page: game name and document titles.
+  app: {
+    name: 'Son Çay',
+    pageTitle: (title) => `Son Çay: ${title}`,
+    titleClosed: 'table deleted',
+    titleTable: 'table',
+    titleLobby: 'lobby',
+    titleSit: 'take a seat',
+    titleCreate: 'new table',
+    titleRecover: 'reclaim your seat',
+    titleAbout: 'about',
+    connecting: 'Connecting…',
+    retry: 'Try again',
+  },
+
+  // Shared by several screens.
+  common: {
+    toHome: 'Back to home',
+    save: 'Save',
+    cancel: 'Cancel',
+    close: 'Close',
+    settings: 'Settings',
+    howToPlay: 'How to play',
+    soon: 'Coming soon',
+    back: 'Back',
+    loading: 'Loading…',
+    oneSecond: 'One moment…',
+    tableTitle: (code) => `Table ${code}`,
+    tableCodeLabel: 'Table code',
+    teaGlass: 'Tea glass',
+    copyright: '© 2026 Malik Fikret. All rights reserved.',
+    language: 'Language',
+    andList,
+  },
+
+  // Form fields shared by the join / create / recovery screens.
+  fields: {
+    name: 'Your name',
+    nameHint: 'Everyone at the table sees this name.',
+    pin: 'Your PIN',
+  },
+
+  errors: {
+    generic: GENERIC,
+    offline: OFFLINE,
+    room: {
+      INVALID_CODE: 'This table code is not valid. Codes have 6 characters.',
+      ROOM_NOT_FOUND: 'No open table has this code.',
+      ROOM_FULL: 'This table is full.',
+      INVALID_NAME: 'Names are 1-20 characters; . $ # [ ] / are not allowed.',
+      NAME_TAKEN: 'Someone at this table already has this name. Pick another one.',
+      INVALID_PIN: 'The PIN must be 4 digits.',
+      WRONG_PIN: 'Wrong PIN.',
+      RETRY_LATER: 'Too many tries. Wait a moment, then try again.',
+      INVALID_SEAT: 'First pick your name from the list.',
+      INVALID_SEAT_ORDER: 'The seating order is not valid.',
+      SEAT_EMPTY: 'This seat is empty now.',
+      ALREADY_MEMBER: 'You already have another seat at this table.',
+      NOT_MEMBER: "You don't have a seat at this table any more.",
+      SEAT_LOST: "You don't have a seat at this table any more.",
+      NOT_IN_LOBBY: 'This can only be done between matches.',
+      INVALID_SETTINGS: 'The table settings are not valid.',
+      NOT_ENOUGH_PLAYERS: 'You need at least 3 players to start a match.',
+      INVALID_ACTION: "You can't do that right now.",
+      ACTION_NOT_ALLOWED: "You can't do that right now.",
+      NO_MATCH: 'No match is running right now.',
+      PLAYER_NOT_ALIVE: 'This player is no longer in the match.',
+      SEAT_PRESENT: 'This player is still online.',
+      CODE_GENERATION_FAILED: "Couldn't create the table. Try again.",
+      WRITE_DENIED: 'That was not accepted. Try again.',
+      INVALID_UID: GENERIC,
+      INVALID_DEPENDENCIES: GENERIC,
+      INVALID_VISIBILITY: GENERIC,
+      INVALID_MODE: GENERIC,
+    },
+    form: {
+      CODE_EMPTY: 'Enter the table code.',
+      NAME_EMPTY: 'Enter your name.',
+      BAD_INVITE: 'The invite link is not valid. Try typing the code.',
+      COPY_FAILED,
+      SETTINGS_FAILED: "Couldn't save the setting; the previous value is back.",
+      CONNECT_FAILED: OFFLINE,
+    },
+  },
+
+  // Game modes.
+  modes: {
+    classic: 'Classic',
+    custom: 'Custom',
+  },
+  modeHints: {
+    classic: 'Classic: items are dealt at random at the start of every round.',
+    custom: 'Custom: items are bought with gold in the shop.',
+  },
+
+  // Home
+  home: {
+    codePlaceholder: '4KX9QZ',
+    join: 'Join table',
+    or: 'or',
+    create: 'New table',
+    note: 'No account, no sign-up. If you came with an invite link, the code is ready.',
+    tagline: 'Take a seat, spin the revolver. Whoever holds the last tea wins.',
+  },
+
+  // Take a seat (join) and the create screen
+  sit: {
+    pinHint: 'Choose your own 4-digit PIN. You need it to reclaim your seat from another device. Keep it to yourself.',
+    join: 'Take a seat',
+    create: 'Create table',
+    playerCount: (count) => plural(count, 'player', 'players'),
+    newTitle: 'New table',
+    newSubtitle: 'Classic · settings in the lobby',
+    seated: 'At the table',
+    matchRunning: "A match is running. If you sit down you'll spectate and join the next match automatically.",
+    haveSeat: 'I already have a seat here',
+  },
+
+  // Reclaim your seat
+  recover: {
+    title: 'Reclaim your seat',
+    button: 'Reclaim your seat',
+    wait: (seconds) => `Wait… ${seconds}`,
+    pickName: 'Pick your name',
+    hostTag: 'host',
+  },
+
+  // About
+  about: {
+    title: 'About',
+    intro: 'A game of tactics, and a little luck, to play online with your friends. The revolver spins in the middle of the table, items change the game, and whoever holds the last tea wins.',
+    version: 'Version',
+    developer: 'Developer',
+    developerName: 'Malik Fikret',
+    language: 'Language',
+    contact: 'Contact',
+    email: 'Email',
+    privacy: 'Privacy',
+    privacyText: "No account needed. Each device gets an anonymous ID in the background. Only what the game needs is stored: the table code, player names, the moves of each match and the points. Your PIN is never shown to other players.",
+    ownership: "The code, design and texts of this app belong to Malik Fikret. They may not be copied, changed or published elsewhere without permission.",
+  },
+
+  // Lobby
+  lobby: {
+    subtitle: 'Lobby',
+    subtitleCount: (count) => `Lobby · ${plural(count, 'player', 'players')}`,
+    leave: 'Leave',
+    leaveLocked: "You can't leave the table during a match",
+    invite: 'Invite link',
+    copied: 'Link copied.',
+    copyFailed: (link) => `${COPY_FAILED} ${link}`,
+    players: 'Players',
+    settingsTitle: 'Game settings',
+    waitingForHost: (hostName) => (hostName ? `The table opens when ${hostName} starts the match` : 'The table opens when the host starts the match'),
+    modeGroup: 'Game mode',
+    decrease: (label) => `${label}: decrease`,
+    increase: (label) => `${label}: increase`,
+    toolsTitle: 'Items in the game',
+    toolCount: (enabled, total) => `${enabled} / ${total}`,
+    toolOff: ' (off)',
+    reset: 'Back to defaults',
+    summaryMode: 'Mode',
+    points: (points) => plural(points, 'point', 'points'),
+    tagMe: 'you',
+    tagHost: 'host',
+    tagAbsent: 'offline',
+    tagWaiting: 'plays next match',
+    leaveTitle: 'Leave the table?',
+    leaveYes: 'Yes, leave',
+    leaveSeat: 'Your seat is freed; if you sit down again, your points start from zero.',
+    leaveCloses: 'Nobody else is at the table, so the table is deleted.',
+    leaveHandsOver: 'Another player becomes the host.',
+  },
+
+  // The stepped match settings of the lobby (label, short label, value).
+  settings: {
+    hp: 'Lives (tea glasses)',
+    hpShort: 'Lives',
+    hpValue: (count) => plural(count, 'tea glass', 'tea glasses'),
+    toolsPerReload: 'Items per round',
+    toolsPerTurn: 'Max items per turn',
+    shotTime: 'Time to fire',
+    seconds: (seconds) => `${seconds} s`,
+  },
+
+  seatOrder: {
+    seatOrderRandom: 'Seating order: random',
+    seatOrderManual: 'Seating order: by hand',
+    editSeatOrder: 'Set the seating order by hand',
+    seatOrderTitle: 'Seating order',
+    seatOrderHint: 'Sort with the arrows. Players who sit down later go to the end.',
+    moveUp: (name) => `${name}: up`,
+    moveDown: (name) => `${name}: down`,
+    randomOrder: 'Random',
+  },
+
+  players: {
+    optionsFor: (name) => `Options for ${name}`,
+    rename: 'Change name',
+    newName: 'New name',
+    handOver: 'Make host',
+    handOverConfirm: (name) => `Make ${name} the host?`,
+    handOverYes: 'Yes, make host',
+    kick: 'Remove from table',
+    kickConfirm: (name) => `Remove ${name} from the table?`,
+    kickYes: 'Yes, remove',
+  },
+
+  start: {
+    startMatch: 'Start match',
+    startNote: 'Offline players are in the match too. You need at least 3 players.',
+    startTooFew: 'You need at least 3 players to start a match.',
+    absentTitle: 'Some players are offline',
+    absentText: 'These players are not connected right now. If the match starts, they play too.',
+    startAnyway: 'Start anyway',
+    starting: 'Starting…',
+  },
+
+  closeRoom: {
+    closeRoom: 'Delete table',
+    closeRoomTitle: 'Delete table?',
+    closeRoomNote: 'The table is deleted for everyone: players, the match and the session points are erased. This cannot be undone.',
+    closeRoomYes: 'Yes, delete',
+    closingRoom: 'Deleting…',
+    closeRoomLocked: 'Available when the match ends.',
+    closeRoomAllAbsent: 'The other players are offline; you can delete the table.',
+    roomClosed: 'Table deleted.',
+    roomClosedSub: "You'll be back on the home page in a moment.",
+    roomClosedByMe: 'You deleted the table.',
+  },
+
+  tablo: {
+    tablo: 'Scoreboard',
+    tabMatch: 'This match',
+    tabSession: 'Session',
+    matchHeader: (n, rounds, mode) => `Match ${n} · ${plural(rounds, 'round', 'rounds')} · ${mode}`,
+    noMatchYet: 'No match has finished yet. The first one shows up here when it ends.',
+    colRank: '#',
+    colPlayer: 'Player',
+    colRounds: 'Rounds',
+    colPoints: 'Points',
+    colMatches: 'Match',
+    colWins: 'Wins',
+    won: 'Won',
+    draw: 'Draw',
+    outInRound: (round) => `out in round ${round}`,
+    removedInRound: (round) => `removed in round ${round}`,
+    me: 'you',
+    leftPlayer: 'Player who left',
+    hpLabel: (hp) => plural(hp, 'life', 'lives'),
+    winsLabel: 'wins',
+    lineLiveOnOther: 'Loaded at others',
+    lineBlankOnOther: 'Empty at others',
+    lineBlankOnSelf: 'Empty at yourself',
+    lineLiveOnSelf: 'Loaded at yourself',
+    lineEliminations: 'Elimination',
+    lineRounds: (count) => `End of round (${plural(count, 'round', 'rounds')})`,
+    lineWin: 'Win (end of match)',
+    linePredictions: 'Prediction',
+    lineTotal: 'Total',
+    times: (count) => (count === 1 ? '1 time' : `${count} times`),
+    matchFootnote: 'Winner first, then players in the order they went out (last out first). Tap a row to see where the points came from.',
+    sessionHeader: (matches) => `${plural(matches, 'match', 'matches')} played · lobby`,
+    noSessionYet: 'No matches played yet.',
+    sessionFootnote: 'The small number under the points is what was won in the last match.',
+  },
+
+  liveTablo: {
+    liveHeader: (round, alive, total, mode) => `Round ${round} · ${alive} / ${total} in play · ${mode}`,
+    inGame: 'in play',
+    absentInGame: 'offline · in play',
+    liveFootnote: 'Players still in play by points, then the others in the order they went out. Tap a row to see where the points came from.',
+    backToTable: 'Back to table',
+  },
+
+  // The match table
+  table: {
+    roundTitle: (round) => `Round ${round}`,
+    tableSubtitle: (code, mode) => `Table ${code} · ${mode}`,
+    directionClockwise: 'Turns go clockwise',
+    directionCounter: 'Turns go counterclockwise',
+    revolverAt: (name) => `The revolver points at ${name}`,
+    tagMe: 'you',
+    tagTurn: 'turn',
+    tagTarget: 'target',
+    tagAbsent: 'offline',
+    livesLabel: (hp, max) => `${hp} / ${plural(max, 'life', 'lives')}`,
+    seatLabel: (name, tags, lives) => [name, tags, lives].filter(Boolean).join(', '),
+    yourTurn: 'Your turn',
+    turnOf: (name) => `Turn: ${name}`,
+    youWon: 'You won',
+    winnerIs: (name) => `Winner: ${name}`,
+    drawResult: 'Draw',
+    matchBegan: 'The match has started.',
+    shotAtOther: (shooter, target) => `${shooter} fired at ${target}.`,
+    shotAtSelf: (shooter) => `${shooter} fired at themselves.`,
+    shotOnTimeout: (shooter) => `Time ran out: ${shooter} fired at themselves.`,
+    effectLive: 'Loaded.',
+    effectBlank: 'Empty.',
+    playerOut: (name) => `${name} is out.`,
+    playerRemovedLine: (name) => `${name} was removed from the table.`,
+    turnSkippedLine: (name) => `${name} is in jail; their turn was skipped.`,
+    matchOver: 'The match is over.',
+    reloadLive: (count) => `${count} Loaded`,
+    reloadBlank: (count) => `${count} Empty`,
+    reloadLabel: 'Bullets loaded',
+    secondsLeft: (seconds) => (seconds === 1 ? '1 second left' : `${seconds} seconds left`),
+    handTitle: (count) => `Your hand · ${plural(count, 'item', 'items')}`,
+    handEmpty: 'Your hand is empty',
+    fire: 'Fire',
+    chooseTarget: 'Pick a target',
+    chooseTargetHint: 'Tap a player or yourself',
+    targetIs: (name) => `target: ${name}`,
+    targetSelf: 'target: yourself',
+    slideToCancel: 'Slide out to cancel',
+    firing: 'Firing…',
+    shotRefused: 'The shot was not accepted. The turn may have changed.',
+    watching: 'Spectating',
+    watchingWaiting: 'Spectating · waiting for the next match',
+    lastEvent: (lead) => `Last move: ${lead}`,
+    reloadCounts: (live, blank) => `${live} Loaded · ${blank} Empty`,
+    reloadAnnounced: (counts) => `Bullets loaded: ${counts}`,
+  },
+
+  kickMatch: {
+    kickFromMatch: 'Remove from table',
+    kickFromMatchFor: (name) => `${name}: remove from table`,
+    kickMatchConfirm: (name) => `Remove ${name} from this match?`,
+    kickMatchNote: "Offline. They count as dead in this match and nobody gets Loot. They stay at the table and play the next match.",
+  },
+
+  // Away from the table: the ⋮ menu and the Home bar (decision Q70)
+  away: {
+    tableMenu: 'Menu',
+    menuHome: 'Home',
+    // Both languages on purpose: findable whatever the current language is.
+    menuLanguage: 'Dil / Language',
+    backToYourTableFirst: 'Go back to your table first.',
+    homeBarTable: (code) => `Table ${code}`,
+    homeBarBack: (code) => `Back to table · Table ${code}`,
+  },
+
+  // The items: names, explanations and card tags, keyed by engine tool id.
+  tools: {
+    names: {
+      detector: 'Eye',
+      probe: 'Scales',
+      counter: 'Counter',
+      skip: 'Skip',
+      swap: 'Trickster',
+      flip: 'Flip',
+      shuffle: 'Shuffle',
+      double: 'Double Shot',
+      reverse: 'Reverse',
+      link: 'Chain',
+      jail: 'Jail',
+      handSwap: 'Hand Swap',
+      steal: 'Steal',
+      shotShield: 'Bullet Shield',
+      toolShield: 'Item Shield',
+      heal: 'Bandage',
+    },
+    help: {
+      detector: 'Shows you alone whether the current bullet is Loaded or Empty.',
+      probe: 'Tells you whether the current bullet and the next one are the same or different.',
+      counter: 'Tells you how many of the current bullet and the next two are Loaded. With fewer than three left, it counts the rest.',
+      skip: 'Move on to the next bullet without firing the current one; it stays your turn. Only you see the bullet you skipped.',
+      swap: 'Swaps the current bullet with the next one, without revealing either.',
+      flip: 'Makes the current bullet work the other way: Loaded fires as Empty, Empty as Loaded. Everyone believes what they see.',
+      shuffle: 'Shuffles the order of the remaining bullets at random.',
+      double: 'If the next shot is Loaded, it takes two glasses (lives).',
+      reverse: 'Reverses the direction the turns go in.',
+      link: 'Chains two players until the end of the round: damage to one hits the other too. You can chain yourself.',
+      jail: "The player you pick skips their next turn. They get out if someone accepts an item from them as ransom.",
+      handSwap: "Swap all your items for another player's items.",
+      steal: "Look at a player's items, take one and give them one of yours. Used up the moment you look.",
+      shotShield: 'Stops the first Loaded bullet aimed at you this round and sends it back to the shooter. Works from your next turn on.',
+      toolShield: 'Cancels the first item used against you this round. Works from your next turn on.',
+      heal: "Win back one glass. You can't go above the glasses you started with.",
+    },
+    tags: {
+      hidden: 'hidden',
+      announced: 'everyone sees',
+      stealAnnounced: 'everyone sees · not what you take',
+      turn: 'on your turn',
+      anytime: 'any time',
+    },
+  },
+
+  // Items on the table: hand, item card, picking, Steal, effects strip, chains
+  tableTools: {
+    usedThisTurn: (used, limit) => `this turn ${used}/${limit}`,
+    usedThisTurnLong: (used, limit) => `This turn: ${used}/${limit} items used`,
+    use: 'Use',
+    useAnyway: 'Use anyway',
+    waitYourTurn: 'Wait for your turn',
+    turnLimitReached: 'Limit reached for this turn',
+    hpFull: 'Your glasses are already full',
+    doubleAlready: 'Double Shot is already set',
+    finishPending: 'Finish the open step first',
+    toolUnavailable: "Can't be used right now",
+    toolRefused: "The item couldn't be used. Things may have changed.",
+    stealNothingToGive: "You have no other item to give: you'll look but can't take anything. Steal is used up anyway.",
+    yourself: 'yourself',
+    pickOne: 'pick a player',
+    pickTwo: 'pick two players',
+    pickSecond: (name) => `${name} · pick the second player`,
+    pickSwap: 'pick the player to swap items with',
+    pickHint: 'Tap a player at the table',
+    toolSending: 'Sending…',
+    toolCount: (count) => plural(count, 'item', 'items'),
+    live: 'Loaded',
+    blank: 'Empty',
+    detectorResult: ' · current bullet ',
+    skipResult: ' · skipped bullet ',
+    probeResult: ' · current and next ',
+    probeLast: ' · this is the last bullet, none after it',
+    same: 'same',
+    different: 'different',
+    // The count comes first in English: " · {b} in the current and next 2 bullets".
+    counterResult: (examined) => (examined === 3 ? ' · {b} in the current and next 2 bullets' : ` · {b} in the last ${plural(examined, 'bullet', 'bullets')}`),
+    liveCount: (count) => `${count} Loaded`,
+    flipResult: ' · current bullet ',
+    flipped: 'works reversed',
+    notFlipped: 'works normally',
+    shieldActive: (count) => (count > 1 ? `active · ${count} shields` : 'active'),
+    shieldWaiting: (count) => (count > 1 ? `from your next turn · ${count} shields` : 'works from your next turn'),
+    effectsLabel: 'Your effects (only you see them)',
+    tagJailed: 'in jail',
+    tagChained: 'chained',
+    chainWith: (name) => `Chained: ${name}`,
+    doubleMark: '×2',
+    doubleLabel: 'Double Shot set: if the next shot is Loaded, it takes two lives',
+    onlyYouSee: 'Only you can see this',
+    stealTitle: (name) => `Steal · ${name}`,
+    stealTake: 'Item you take',
+    stealGive: 'You give in return',
+    stealExchange: 'Swap',
+    stealNothing: 'Take nothing',
+    stealVictimEmpty: (name) => `${name} has no items.`,
+    stealMineEmpty: "You have no item to give, so you can't take anything.",
+    stealPending: 'Steal · make your choice',
+    toolLine: (name, tool, detail) => (detail ? `${name} used an item: ${tool} · ${detail}.` : `${name} used an item: ${tool}.`),
+    toolBlockedTail: (names) => `Item Shield cancelled it: ${names}.`,
+  },
+
+  // Shot result notice (decision Q68)
+  shotNotice: {
+    shotNoticeLive: 'Loaded',
+    shotNoticeBlank: 'Empty',
+    shotNoticeDouble: '2×',
+    shotNoticeSelf: (name) => `${name} fired at themselves`,
+    shotNoticeDamage: (amount) => `−${amount}`,
+    shotNoticeOut: '· out',
+    shotNoticeChain: '· chain',
+    shotNoticeReflected: 'shield sent it back',
+    shotNoticeAbsorbed: 'shield stopped it',
+    shotNoticeTwoShields: 'two shields, nobody was hurt',
+    shotNoticeTurn: (name) => `Turn: ${name}.`,
+  },
+
+  // Private item result notice (decision Q69)
+  toolNotice: {
+    toolNoticeLast: 'Last bullet',
+  },
+
+  // Loot (decision 63): the looter's private card
+  loot: {
+    lootLabel: 'Loot',
+    lootTitle: (name) => `Loot: ${name}`,
+    lootOnlyYouPick: 'Only you can see this · pick one',
+    lootOnlyYou: 'Only you can see this',
+    lootTake: 'Take',
+    lootEmpty: 'Their hand was empty',
+    lootNothing: 'Nothing to take.',
+    lootOk: 'OK',
+    lootGone: 'Your Loot has expired.',
+    lootRefused: "Couldn't take the Loot.",
+  },
+
+  // Ransom (decision 64): the Jail ransom, for the two players involved only
+  ransom: {
+    ransomButton: 'Ransom',
+    ransomHint: "You're in jail: offer an item; if it's accepted, you're out.",
+    ransomPending: (name, tool) => `Your ransom offer: ${name} · ${tool}`,
+    ransomWithdraw: 'Withdraw',
+    ransomChange: 'Change',
+    ransomSheetNote: 'Only you and the player you pick can see this.',
+    ransomTo: 'To',
+    ransomWhich: 'Which item',
+    ransomSend: 'Offer',
+    ransomIncomingTitle: (name) => `Ransom: ${name}`,
+    ransomIncomingSub: "Only you can see this · if you accept, they're out of jail",
+    ransomAccept: 'Accept',
+    ransomReject: 'Reject',
+    ransomAcceptedMine: "Ransom accepted: you're out of jail.",
+    ransomAcceptedOther: 'Ransom accepted: the item is yours now.',
+    ransomRejected: 'Ransom rejected.',
+    ransomWithdrawn: 'Offer withdrawn.',
+    ransomLapsed: 'The offer lapsed.',
+    ransomNotFunded: 'The offered item is gone.',
+    ransomGone: 'This offer is no longer valid.',
+    ransomRefused: "Couldn't send the ransom.",
+    jailReleasedLine: (name) => `${name} is out of jail.`,
+  },
+
+  // End of the match
+  end: {
+    endTop: (code, mode, n) => `Table ${code} · ${mode} · Match ${n}`,
+    matchEnded: 'Match over',
+    endMine: 'The last tea is yours.',
+    endLastTea: (name) => `${name} drank the last tea.`,
+    endYouOut: (round) => `You went out in round ${round}.`,
+    endYouRemoved: (round) => `You were removed from the match in round ${round}.`,
+    endWatched: 'You spectated this match.',
+    endNobody: 'Nobody won.',
+    endDrawLine: 'The last bullet took the rest together.',
+    rankingTitle: 'This match',
+    rankingLabel: 'Ranking of this match',
+    rankingCols: 'points · session total',
+    wonRounds: (rounds) => `won · ${plural(rounds, 'round', 'rounds')}`,
+    drawRounds: (rounds) => `draw · ${plural(rounds, 'round', 'rounds')}`,
+    sessionTotal: (points) => `total ${points}`,
+    backToLobby: 'Back to lobby',
+    resultsSaving: 'Saving results…',
+    place: (place) => ordinal(place),
+  },
+});
