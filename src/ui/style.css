@@ -2173,25 +2173,34 @@ li.tablo-row { min-height: 56px; }
 
 .revolver-svg { display: block; overflow: visible; }
 
+/* The fire press (step 4.4b, decisions Q55 / Q74): while spinning, JS sets the angle on every
+   frame at a constant speed (no transition). The final short stop: only the mirror flip, if the
+   target is on the left, eases in. */
+.revolver.is-spinning { transition: none; }
+.revolver.is-settling { transition: transform 0.12s ease-out; }
+
 /* The moving parts turn / scale around their own pivot: revolver.js places each part's group at
    the pivot given per revolver (revolvers.js), so the origin is always the local 0 0. */
 .rv-flash,
+.rv-smoke,
 .rv-body,
 .rv-hammer {
   transform-box: view-box;
   transform-origin: 0 0;
 }
 
-.rv-flash { opacity: 0; }
+.rv-flash,
+.rv-smoke { opacity: 0; }
 
 .rv-hammer { transition: transform 0.6s ease-out; }
 
-/* Long press: the hammer is drawn back slowly, then the revolver trembles while held. */
+/* Long press: the hammer is drawn back slowly and stays back (no tremble: the revolver spins). */
 .revolver.is-cocking .rv-hammer { transform: rotate(-18deg); }
-.revolver.is-cocked .revolver-svg { animation: rv-tremble 0.09s linear infinite; }
 
 /* The shot (approved draft, conversation 8 model 3): cylinder 3 x 0.12 s, hammer at 0.38 s,
-   then flash + recoil (Dolu) or a dry click (Boş) at 0.44 s. revolver.js SHOT_TIMING matches. */
+   then at 0.44 s flash + recoil (Dolu) or a dry click + a puff of smoke (Boş, decision Q75).
+   The flash and the smoke are inside the body, so they follow the recoil. revolver.js
+   SHOT_TIMING matches. */
 .revolver.is-live .rv-flutes,
 .revolver.is-blank .rv-flutes { animation: rv-spin 0.12s linear 3; }
 .revolver.is-live .rv-hammer,
@@ -2199,6 +2208,7 @@ li.tablo-row { min-height: 56px; }
 .revolver.is-live .rv-body { animation: rv-recoil 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) 0.44s; }
 .revolver.is-blank .rv-body { animation: rv-click 0.2s ease-out 0.44s; }
 .revolver.is-live .rv-flash { animation: rv-flash 0.5s ease-out 0.44s; }
+.revolver.is-blank .rv-smoke { animation: rv-smoke 0.7s ease-out 0.44s; }
 
 /* One mark spacing per turn (--rv-step, per revolver; set by revolver.js). */
 @keyframes rv-spin { from { transform: translateY(0); } to { transform: translateY(var(--rv-step, 14px)); } }
@@ -2214,17 +2224,25 @@ li.tablo-row { min-height: 56px; }
   30% { transform: translateX(-2px); }
   60% { transform: translateX(1px); }
 }
+/* The full flame: bursts out from the muzzle, holds a moment, then dies away. */
 @keyframes rv-flash {
-  0% { opacity: 0; transform: scale(0.4); }
-  10% { opacity: 1; transform: scale(1.15); }
-  35% { opacity: 0; transform: scale(1.4); }
-  100% { opacity: 0; }
+  0% { opacity: 0; transform: scale(0.35, 0.5); }
+  8% { opacity: 1; transform: scale(1.05); }
+  22% { opacity: 1; transform: scale(1.15); }
+  45% { opacity: 0; transform: scale(1.35, 1.2); }
+  100% { opacity: 0; transform: scale(1.35, 1.2); }
 }
-@keyframes rv-tremble {
-  0%, 100% { transform: translate(0, 0); }
-  25% { transform: translate(0.8px, -0.6px); }
-  50% { transform: translate(-0.6px, 0.8px); }
-  75% { transform: translate(0.6px, 0.4px); }
+/* The puff: appears at the muzzle, drifts out a little, grows and fades. */
+@keyframes rv-smoke {
+  0% { opacity: 0; transform: translate(0, 0) scale(0.35); }
+  18% { opacity: 0.9; transform: translate(4px, -1px) scale(0.8); }
+  100% { opacity: 0; transform: translate(22px, -7px) scale(1.7); }
+}
+/* Hareketler off: the same flame / puff, in place, a short fade with no movement. */
+@keyframes rv-fade {
+  0% { opacity: 0; }
+  15% { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 /* Reload announcement: a moment in the middle of the table, then gone. */
@@ -2704,16 +2722,21 @@ li.tablo-row { min-height: 56px; }
   50% { box-shadow: 0 0 0 4px rgba(217, 68, 58, 0.55), 0 0 28px rgba(217, 68, 58, 0.7); }
 }
 
-/* Hareketler off (decision Q53): only the flash and the hammer of the shot, no turn, recoil,
-   tremble or pulse; the phone's own "reduce motion" setting is not used. */
-.motion-off .revolver { transition: none; }
+/* Hareketler off (decision Q53): no spin, no turn, recoil or pulse; the hammer falls at once and
+   the flash (Dolu) or the smoke (Boş) is a short static fade in place (decision Q75). The
+   phone's own "reduce motion" setting is not used. revolver.js SHOT_TIMING.reduced* matches. */
+.motion-off .revolver,
+.motion-off .revolver.is-settling { transition: none; }
 .motion-off .revolver.is-live .rv-flutes,
 .motion-off .revolver.is-blank .rv-flutes,
 .motion-off .revolver.is-live .rv-body,
 .motion-off .revolver.is-blank .rv-body,
-.motion-off .revolver.is-cocked .revolver-svg,
 .motion-off .seat.is-hit { animation: none; }
 .motion-off .rv-hammer { transition: none; }
+.motion-off .revolver.is-live .rv-hammer,
+.motion-off .revolver.is-blank .rv-hammer { animation: rv-hammer 0.06s ease-in forwards; }
+.motion-off .revolver.is-live .rv-flash { animation: rv-fade 0.42s linear 0.06s; transform: none; }
+.motion-off .revolver.is-blank .rv-smoke { animation: rv-fade 0.42s linear 0.06s; transform: none; }
 .motion-off .reload-banner.is-showing { animation: none; }
 .motion-off .fire-button.is-urgent {
   animation: none;

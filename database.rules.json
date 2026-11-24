@@ -178,6 +178,25 @@
             }
           }
         },
+        "press": {
+          ".read": "auth != null && root.child('rooms').child($code).child('members').child(auth.uid).exists() && root.child('rooms').child($code).child('seats').child(root.child('rooms').child($code).child('members').child(auth.uid).val()).child('uid').val() === auth.uid",
+          "$seatId": {
+            ".write": "auth != null && $code.matches(/^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$/) && root.child('rooms').child($code).child('meta').exists() && $seatId.matches(/^s(0[1-9]|1[0-5])$/) && ((root.child('rooms').child($code).child('members').child(auth.uid).val() === $seatId && root.child('rooms').child($code).child('seats').child($seatId).child('uid').val() === auth.uid && (!newData.exists() || root.child('rooms').child($code).child('meta/status').val() === 'playing')) || (!newData.exists() && root.child('rooms').child($code).child('members').child(auth.uid).val() === $seatId && root.child('rooms').child($code).child('seats').child($seatId).child('uid').val() === auth.uid && root.child('rooms').child($code).child('meta/status').val() === 'lobby' && !newData.parent().parent().child('seats').child($seatId).exists()) || (!newData.exists() && root.child('rooms').child($code).child('members').child(auth.uid).val() === root.child('rooms').child($code).child('meta/hostSeat').val() && root.child('rooms').child($code).child('seats').child(root.child('rooms').child($code).child('meta/hostSeat').val()).child('uid').val() === auth.uid && $seatId !== root.child('rooms').child($code).child('meta/hostSeat').val() && root.child('rooms').child($code).child('meta/status').val() === 'lobby' && !newData.parent().parent().child('seats').child($seatId).exists()))",
+            ".validate": "newData.hasChildren(['n', 'seq', 'at']) && newData.child('at').val() === now",
+            "n": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000000000"
+            },
+            "seq": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000000000"
+            },
+            "at": {
+              ".validate": "newData.val() === now"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        },
         "names": {
           ".read": "auth != null && $code.matches(/^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$/)",
           "$key": {

@@ -25,6 +25,7 @@ import { createSettingsFunctions } from './settings.js';
 import { createLobbyFunctions } from './lobby.js';
 import { createSeatOrderFunctions } from './seat-order.js';
 import { createMatchFunctions } from './match.js';
+import { createPressFunctions } from './press.js';
 import { createTrafficCounter } from './match-helpers.js';
 import {
   HOST_SEAT,
@@ -466,6 +467,9 @@ export function createRoomApi(deps) {
 
   const deleteRoom = createCloseFunction({ read, writeAll, requireUid, requireCode, currentSeat, stopLiveFor });
 
+  // The press signal (step 4.4b): setPress / clearPress need onDisconnect, watchPress onValue.
+  const pressFunctions = createPressFunctions({ deps, db, ref, writeAll, serverTimestamp, requireUid, requireCode, requireSeat });
+
   return {
     createRoom,
     joinRoom,
@@ -484,5 +488,6 @@ export function createRoomApi(deps) {
     setSeatOrder,
     clearSeatOrder,
     ...matchFunctions,
+    ...pressFunctions,
   };
 }

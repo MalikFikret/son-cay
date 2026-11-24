@@ -1,6 +1,6 @@
 // The six revolvers (decision Q43; approved drawings: conversation 8, model 2, "Altı tabanca"),
 // copied as they are and split into the same moving parts, so the table's animations (cock,
-// tremble, cylinder turn, hammer fall, Dolu recoil + flash, Boş click) work on every one:
+// spin, cylinder turn, hammer fall, Dolu recoil + flash, Boş click + smoke) work on every one:
 //
 // - body:   everything that recoils, in the drawing's order; the token 'FLUTES' marks where the
 //           cylinder marks go, and the hammer is drawn last, on top (as in the drawings).
@@ -12,7 +12,8 @@
 // - hammer: the hammer drawing.
 // - pivots: where each part turns or scales, in the drawing's units (viewBox 40 0 300 190):
 //           `hammer` (it rotates back when cocked and falls on the shot), `body` (the recoil
-//           rotation) and `muzzle` (the flash grows from there; the flash drawing is placed there).
+//           rotation) and `muzzle` (the flash and the smoke grow from there; both drawings are
+//           placed there, inside the body, so they follow the recoil).
 //
 // Attribute values 'HATCH' and 'GRIP' stand for this drawing's own pattern / clip ids, made
 // unique per element by revolver.js (several revolvers can be on one page: the settings grid).
@@ -22,11 +23,27 @@
 export const REVOLVER_IDS = Object.freeze(['birdHead', 'cowboy', 'detective', 'heavy', 'oldSoldier', 'mosul']);
 export const DEFAULT_REVOLVER = 'mosul';
 
-/** The flash drawing, made for a muzzle at FLASH_ORIGIN; moved to each revolver's muzzle. */
+/**
+ * The muzzle effects, drawn for a muzzle at FLASH_ORIGIN and moved to each revolver's muzzle.
+ * Dolu (decision Q75): a full flame about twice the first draft's size (68 x 44 instead of
+ * 34 x 26): an orange outer flame, a yellow one, a white-hot core and three sparks.
+ */
 export const FLASH_ORIGIN = Object.freeze([280, 50]);
 export const FLASH = Object.freeze([
-  ['path', { d: 'M280 50 L298 38 L294 48 L314 50 L294 53 L300 64 L280 54 Z', fill: '#F2B53A' }],
-  ['path', { d: 'M280 50 L290 45 L288 50 L298 51 L288 52 L290 57 Z', fill: '#FFF2C4' }],
+  ['path', { d: 'M280 49 L300 30 L303 42 L326 28 L319 45 L348 50 L319 55 L326 72 L303 58 L300 70 L280 52 Z', fill: '#E8762B' }],
+  ['path', { d: 'M280 49 L296 38 L299 46 L317 39 L312 48 L334 50 L312 52 L317 61 L299 54 L296 62 L280 52 Z', fill: '#F2B53A' }],
+  ['path', { d: 'M280 49 L292 44 L295 48.5 L312 50 L295 51.5 L292 56 L280 51.5 Z', fill: '#FFF2C4' }],
+  ['circle', { cx: 337, cy: 35, r: 1.8, fill: '#F2B53A' }],
+  ['circle', { cx: 341, cy: 65, r: 1.6, fill: '#F2B53A' }],
+  ['circle', { cx: 355, cy: 47, r: 1.4, fill: '#FFF2C4' }],
+]);
+
+/** Boş (decision Q75): a small puff of white smoke at the muzzle (it drifts out and fades). */
+export const SMOKE = Object.freeze([
+  ['circle', { cx: 288, cy: 49, r: 6.5, fill: '#F2ECDD' }],
+  ['circle', { cx: 298, cy: 44, r: 8, fill: '#F2ECDD' }],
+  ['circle', { cx: 299, cy: 54, r: 6, fill: '#F2ECDD' }],
+  ['circle', { cx: 309, cy: 48, r: 7, fill: '#F2ECDD' }],
 ]);
 
 const HATCHED = ['rect', { x: 50, y: 36, width: 80, height: 150, fill: 'url(#HATCH)', 'clip-path': 'url(#GRIP)', opacity: 0.55 }];

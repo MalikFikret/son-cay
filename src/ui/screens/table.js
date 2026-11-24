@@ -71,7 +71,17 @@ import {
 } from '../ransom-model.js';
 import { revolverSvg, SHOT_TIMING } from '../revolver.js';
 import { chosenRevolver, motionOn, onSettingsChange } from '../device-settings.js';
-import { LONG_PRESS_MS, PRESS, initialPress, isPressing, pressStep } from '../fire-press.js';
+import { LONG_PRESS_MS, initialPress, isPressing, pressStep } from '../fire-press.js';
+import {
+  QUICK_SPIN_MIN_DEG,
+  SPIN_SETTLE_MS,
+  STOP_MIN_DEG,
+  activePress,
+  pressExpiresAt,
+  signalStep,
+  spinAngle,
+  stopPlan,
+} from '../press-signal.js';
 import {
   STAGE_WIDTH,
   URGENT_MS,
@@ -148,6 +158,13 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
   let holdTimer = null;
   let sending = false;
   let angle = NaN;
+  // The spinning revolver during a fire press (step 4.4b, decisions Q55 / Q74): null, or
+  // { kind: 'local' (my own press) | 'signal' (another player's press signal), from, startedAt,
+  // flip, stopAt, frame }. Never while Hareketler is off.
+  let spin = null;
+  let shotPlaying = false; // a shot is being played: it wins over any press signal
+  let pressMap = {}; // the press branch as last read (normalizePress)
+  let pressSent = false; // my own press signal is written
   let showingEnd = false;
   // Picking a tool's target(s) on the table (mine only, never sent before the tool itself):
   // { tool, picks: string[], need, candidates, kind: 'tool' | 'handSwap' } or null.
@@ -633,7 +650,11 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
   try {
     stops.push(api.watchMatch({ uid, code, onUpdate: enqueue, onError: report }));
     stops.push(api.runMatchClock({ uid, code, onError: report }));
-    if (typeof watchServerOffset === 'function') stops.push(watchServerOffset((value) => { offset = value; }));
+    if (typeof watchServerOffset === 'function') stops.push(watchServerOffset((value) => { offset = value; evaluatePress(); }));
+    // Other players' fire presses (only THAT someone is pressing, never the target).
+    if (typeof api.watchPress === 'function') {
+      stops.push(api.watchPress({ uid, code, onUpdate: (press) => { pressMap = press; evaluatePress(); }, onError: report }));
+    }
   } catch (error) {
     report(error);
   }
@@ -736,12 +757,18 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
       lootPicks.clear();
     }
     const shots = shotsIn(update.events);
-    if (animate && applied) {
+    if (animate && applied && shots.length > 0) {
+      // The shot wins over any press signal: spin on to the target (or one short spin after a
+      // quick press), stop there, then the shot.
+      shotPlaying = true;
       for (const shot of shots) {
         if (destroyed) return;
-        await aimAt(shot.target);
+        await spinToTarget(shot.target);
         await shotAnimation(shot);
       }
+      shotPlaying = false;
+    } else if (shots.length > 0) {
+      endSpin();
     }
     if (destroyed) return;
     if (!update.initial) {
@@ -773,6 +800,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
     tablo.refresh();
     const reload = reloadFor(update);
     if (reload) showReload(reload);
+    evaluatePress();
   }
 
   // --- Rendering -------------------------------------------------------------------------------
@@ -1254,30 +1282,146 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
   }
 
   // --- Revolver --------------------------------------------------------------------------------
-  function pointRevolver(seatId) {
+  // Always the same function list, so a turn (and the mirror flip) interpolates smoothly.
+  function setRevolver(deg, flip) {
+    revolverWrap.style.transform = `rotate(${deg.toFixed(1)}deg) scaleY(${flip})`;
+  }
+
+  /** The angle from the table centre to a seat, or null. */
+  function angleTo(seatId) {
     const seat = seatId ? seatEls.get(seatId) : null;
-    if (!seat?.spot || !applied) return;
+    if (!seat?.spot || !applied) return null;
     const width = stage.clientWidth || STAGE_WIDTH;
     const layout = seatLayout(applied.view.players.length);
     const point = { x: (seat.spot.x / STAGE_WIDTH) * width, y: seat.spot.y };
-    const next = nearestAngle(angle, aimAngle({ x: width / 2, y: layout.cy }, point));
+    return aimAngle({ x: width / 2, y: layout.cy }, point);
+  }
+
+  function pointRevolver(seatId) {
+    const raw = angleTo(seatId);
+    if (raw === null) return false;
+    revolverWrap.setAttribute('aria-label', t('table.revolverAt', nameOf(seatId)));
+    if (spin) return false; // the spin owns the revolver until it stops
+    const next = nearestAngle(angle, raw);
     const moved = !Number.isFinite(angle) || Math.abs(next - angle) > 1;
     angle = next;
-    // Always the same function list, so the turn (and the mirror flip) interpolates smoothly.
-    revolverWrap.style.transform = `rotate(${next.toFixed(1)}deg) scaleY(${pointsLeft(next) ? -1 : 1})`;
-    revolverWrap.setAttribute('aria-label', t('table.revolverAt', nameOf(seatId)));
+    setRevolver(next, pointsLeft(next) ? -1 : 1);
     return moved;
   }
 
-  async function aimAt(seatId) {
-    const moved = pointRevolver(seatId);
-    if (moved) await wait(reducedMotion() ? SHOT_TIMING.reducedAim : SHOT_TIMING.aim);
+  // The spin: a constant speed, the same on every screen, never slowing near anything (it gives
+  // nothing away). Driven by animation frames; its angle comes from the time, so a slow or hidden
+  // tab catches up. Never while Hareketler is off.
+  function startSpin(kind) {
+    if (spin || reducedMotion() || destroyed) return;
+    const from = Number.isFinite(angle) ? angle : 0;
+    spin = { kind, from, startedAt: performance.now(), flip: pointsLeft(from) ? -1 : 1, stopAt: null, frame: 0 };
+    revolverWrap.classList.remove('is-settling');
+    revolverWrap.classList.add('is-spinning');
+    const step = () => {
+      if (!spin || destroyed) return;
+      const now = spinAngle(spin, performance.now());
+      setRevolver(spin.stopAt === null ? now : Math.min(now, spin.stopAt), spin.flip);
+      spin.frame = requestAnimationFrame(step);
+    };
+    spin.frame = requestAnimationFrame(step);
+  }
+
+  function spinNow() {
+    if (!spin) return angle;
+    const now = spinAngle(spin, performance.now());
+    return spin.stopAt === null ? now : Math.min(now, spin.stopAt);
+  }
+
+  /** Stops a spin where it is, without animating (a skipped shot, a destroyed table). */
+  function endSpin() {
+    if (!spin) return;
+    cancelAnimationFrame(spin.frame);
+    angle = spinNow();
+    spin = null;
+    revolverWrap.classList.remove('is-spinning', 'is-settling');
+  }
+
+  /** A press was cancelled or its signal went stale: back to the pose before the press. */
+  function stopSpinReset() {
+    if (!spin) return;
+    endSpin();
+    if (applied) pointRevolver(revolverSeat({ target, view: applied.view }));
+  }
+
+  /**
+   * Before a shot: keep spinning the same way (or one short spin after a quick press) and stop
+   * ON the target, then the short final stop. Hareketler off: point at once.
+   */
+  async function spinToTarget(seatId) {
+    const raw = angleTo(seatId);
+    if (raw === null) return;
+    if (reducedMotion()) {
+      endSpin();
+      pointRevolver(seatId);
+      await wait(SHOT_TIMING.reducedAim);
+      return;
+    }
+    const wasSpinning = spin !== null;
+    if (!wasSpinning) startSpin('shot');
+    if (!spin) return;
+    const plan = stopPlan({ current: spinNow(), target: raw, minDeg: wasSpinning ? STOP_MIN_DEG : QUICK_SPIN_MIN_DEG });
+    spin.stopAt = plan.final;
+    await wait(plan.ms);
+    if (destroyed) return;
+    endSpin();
+    angle = plan.final;
+    // The final short stop: only the mirror flip (if the target is on the left) eases in.
+    revolverWrap.classList.add('is-settling');
+    setRevolver(angle, pointsLeft(angle) ? -1 : 1);
+    revolverWrap.setAttribute('aria-label', t('table.revolverAt', nameOf(seatId)));
+    await wait(SPIN_SETTLE_MS);
+    revolverWrap.classList.remove('is-settling');
+  }
+
+  // --- The press signal (step 4.4b) -------------------------------------------------------------
+  // Believed only for the seat the countdown waits for, in this match and countdown, and while
+  // not older than the shot time (press-signal.js activePress). My own seat's signal is mine: my
+  // screen follows my own press, not the echo of its signal.
+  function evaluatePress() {
+    if (destroyed || !applied) return;
+    if (reducedMotion()) {
+      if (spin?.kind === 'signal') stopSpinReset();
+      return;
+    }
+    const serverNow = Date.now() + offset;
+    let active = activePress({ press: pressMap, view: applied.view, n: applied.n, serverNow });
+    if (active === mySeat) active = null;
+    const step = signalStep({ spinning: spin ? (spin.kind === 'signal' ? 'signal' : 'local') : 'none', shotPlaying, active });
+    if (step === 'start') startSpin('signal');
+    else if (step === 'stop') stopSpinReset();
+    // Re-check when the signal would go stale, so it never spins on past its time.
+    if (active !== null) {
+      const ms = pressExpiresAt(pressMap[active], applied.view) - serverNow + 50;
+      later(evaluatePress, Math.max(50, ms), 'pressExpiry');
+    }
+  }
+
+  function sendPress() {
+    if (!applied || pressSent) return;
+    pressSent = true;
+    api.setPress({ uid, code, seatId: mySeat, n: applied.n, seq: applied.view.clock.seq }).catch(() => {
+      // Only the other screens' spin depends on it: the press itself goes on.
+    });
+  }
+
+  function clearMyPress() {
+    if (!pressSent) return;
+    pressSent = false;
+    api.clearPress({ uid, code, seatId: mySeat }).catch(() => {
+      // onDisconnect removes it at the latest; every screen ignores it once it is stale.
+    });
   }
 
   async function shotAnimation(shot) {
     const reduced = reducedMotion();
     const live = shot.effect === 'live';
-    revolverWrap.classList.remove('is-live', 'is-blank', 'is-cocking', 'is-cocked');
+    revolverWrap.classList.remove('is-live', 'is-blank', 'is-cocking');
     void revolverWrap.offsetWidth; // restart the keyframes
     revolverWrap.classList.add(live ? 'is-live' : 'is-blank');
     const total = live ? (reduced ? SHOT_TIMING.reducedLive : SHOT_TIMING.live) : (reduced ? SHOT_TIMING.reducedBlank : SHOT_TIMING.blank);
@@ -1290,7 +1434,7 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
             later(() => seat.el.classList.remove('is-hit'), 700);
           }
         }
-      }, reduced ? 0 : 440);
+      }, reduced ? SHOT_TIMING.reducedEffect : SHOT_TIMING.effect);
     }
     await wait(total);
     revolverWrap.classList.remove('is-live', 'is-blank');
@@ -1323,15 +1467,18 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
       holdTimer = null;
     }
     if (effect === 'cock') {
+      // The hammer is drawn back, the revolver spins (on my screen too: it no longer stays on my
+      // target) and the other screens learn THAT I am pressing (never at whom).
       revolverWrap.classList.add('is-cocking');
-      later(() => {
-        if (press.phase === PRESS.COCKED) revolverWrap.classList.add('is-cocked');
-      }, reducedMotion() ? 0 : 600, 'cocked');
+      startSpin('local');
+      sendPress();
     } else if (effect === 'cancel') {
-      revolverWrap.classList.remove('is-cocking', 'is-cocked');
+      revolverWrap.classList.remove('is-cocking');
+      if (spin?.kind === 'local') stopSpinReset();
+      clearMyPress();
     } else if (effect && effect.fire) {
-      // A long press keeps the hammer drawn back until the shot animation lets it fall.
-      revolverWrap.classList.remove('is-cocked');
+      // A long press keeps the hammer drawn back (and the revolver spinning) until the shot
+      // animation stops it on the target and lets the hammer fall.
       fire();
     }
     if (applied) renderFire();
@@ -1388,17 +1535,28 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
   // ONE chooseTarget aims and fires in the same write: the confirmation step is off by default in
   // the engine (decision 55), so the target is never stored before the shot.
   async function fire() {
-    if (!canFire()) return;
+    if (!canFire()) {
+      if (spin?.kind === 'local') stopSpinReset();
+      revolverWrap.classList.remove('is-cocking');
+      clearMyPress();
+      return;
+    }
     const aimed = target;
     sending = true;
     renderAll();
+    let fired = false;
     try {
       const result = await api.submitAction({ uid, code, action: { type: 'chooseTarget', target: aimed } });
+      fired = result.ok === true;
       if (!destroyed && !result.ok) showError(t('table.shotRefused'));
     } catch (error) {
       report(error);
     } finally {
       sending = false;
+      // Removed only after the shot is written, so every other screen sees the shot before the
+      // signal goes (no reset-then-spin flicker between the two).
+      clearMyPress();
+      if (!fired && spin?.kind === 'local') stopSpinReset();
       if (!destroyed) {
         if (!revolverWrap.classList.contains('is-live') && !revolverWrap.classList.contains('is-blank')) {
           revolverWrap.classList.remove('is-cocking');
@@ -1466,6 +1624,8 @@ export function createTable({ api, uid, code, mode, mySeat, watchServerOffset, o
     destroy() {
       if (destroyed) return;
       dispatch({ type: 'expire' });
+      clearMyPress();
+      endSpin();
       destroyed = true;
       tablo.destroy();
       kickSheet.destroy();

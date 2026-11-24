@@ -153,14 +153,16 @@ describe('the six revolvers', () => {
       const nodes = walk(revolverTree(id, { uid: 't' }));
       const byClass = (name) => nodes.filter((n) => n.attrs.class === name);
       for (const part of REVOLVER_PARTS) assert.equal(byClass(part).length, 1, `${id}: ${part}`);
-      // Hammer and cylinder marks move with the body (inside it); the flash does not.
+      // Hammer, cylinder marks, flash and smoke move with the body (inside it: step 4.4b, the
+      // flash follows the recoil).
       const inside = (name, parent) => byClass(name)[0].ancestors.some((a) => a.attrs.class === parent);
       assert.ok(inside('rv-hammer', 'rv-body'), id);
       assert.ok(inside('rv-flutes', 'rv-body'), id);
-      assert.ok(!inside('rv-flash', 'rv-body'), id);
+      assert.ok(inside('rv-flash', 'rv-body'), id);
+      assert.ok(inside('rv-smoke', 'rv-body'), id);
       // Each pivoted part sits in a group placed at its pivot (the CSS origin is the local 0 0).
       const { pivots } = REVOLVERS[id];
-      for (const [part, key] of [['rv-hammer', 'hammer'], ['rv-body', 'body'], ['rv-flash', 'muzzle']]) {
+      for (const [part, key] of [['rv-hammer', 'hammer'], ['rv-body', 'body'], ['rv-flash', 'muzzle'], ['rv-smoke', 'muzzle']]) {
         const parent = byClass(part)[0].ancestors.at(-1);
         assert.equal(parent.attrs.transform, `translate(${pivots[key][0]} ${pivots[key][1]})`, `${id}: ${part}`);
         assert.ok(pivots[key].every(Number.isFinite), `${id}: ${key}`);
@@ -187,14 +189,16 @@ describe('the six revolvers', () => {
     });
   }
 
-  test('the flash is moved to each muzzle', () => {
+  test('the flash and the smoke are moved to each muzzle', () => {
     for (const id of REVOLVER_IDS) {
       const nodes = walk(revolverTree(id, { uid: 'f' }));
-      const flash = nodes.find((n) => n.attrs.class === 'rv-flash');
       const { muzzle } = REVOLVERS[id].pivots;
-      const inner = flash.ancestors.length; // the flash drawing's shift is two levels below
-      const shift = nodes.find((n) => n.ancestors.length === inner + 2 && n.ancestors[inner]?.attrs.class === 'rv-flash');
-      assert.equal(shift.attrs.transform, `translate(${muzzle[0] - FLASH_ORIGIN[0]} ${muzzle[1] - FLASH_ORIGIN[1]})`, id);
+      for (const part of ['rv-flash', 'rv-smoke']) {
+        const effect = nodes.find((n) => n.attrs.class === part);
+        const inner = effect.ancestors.length; // the drawing's shift is two levels below
+        const shift = nodes.find((n) => n.ancestors.length === inner + 2 && n.ancestors[inner]?.attrs.class === part);
+        assert.equal(shift.attrs.transform, `translate(${muzzle[0] - FLASH_ORIGIN[0]} ${muzzle[1] - FLASH_ORIGIN[1]})`, `${id} ${part}`);
+      }
     }
   });
 
@@ -256,12 +260,12 @@ describe('motion follows only the Hareketler switch (Q53)', () => {
 
   test('the reduced rules hang on the root class, and the table asks the switch', () => {
     const css = read('src/ui/style.css');
-    for (const rule of ['.motion-off .revolver { transition: none; }', '.motion-off .sheet-panel', '.motion-off .shot-notice', '.motion-off .fire-button.is-urgent']) {
+    for (const rule of ['.motion-off .revolver,', '.motion-off .sheet-panel', '.motion-off .shot-notice', '.motion-off .fire-button.is-urgent']) {
       assert.ok(css.includes(rule), rule);
     }
     assert.match(read('src/ui/screens/table.js'), /const reducedMotion = \(\) => !motionOn\(\);/);
     assert.equal(SHOT_TIMING.reducedLive, 500);
-    assert.equal(SHOT_TIMING.reducedBlank, 300);
+    assert.equal(SHOT_TIMING.reducedBlank, 500); // the smoke's short fade (step 4.4b)
     assert.equal(SHOT_TIMING.reducedAim, 0);
   });
 });

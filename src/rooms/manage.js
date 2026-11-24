@@ -102,6 +102,7 @@ export function createManageFunctions(ctx) {
       [paths.secret(roomCode, seatId)]: null,
       [paths.claim(roomCode, seatId)]: null,
       [paths.presenceSeat(roomCode, seatId)]: null,
+      [paths.press(roomCode, seatId)]: null,
       [paths.name(roomCode, nameKey(seat.name))]: null,
       [paths.member(roomCode, seat.uid)]: null,
     };

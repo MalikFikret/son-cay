@@ -1,12 +1,14 @@
 // The revolver in the middle of the table: the player's own choice of the six approved revolvers
 // (decision Q43, data in revolvers.js; default "Musul Gravürü"), each split into the parts that
 // move: the body (recoil / dry click), the cylinder marks (they slide while the cylinder turns),
-// the hammer and the muzzle flash. The same builder draws the small previews of Ayarlar.
+// the hammer, the muzzle flash and the smoke puff (both inside the body: they follow the recoil).
+// The same builder draws the small previews of Ayarlar.
 //
-// The animation follows the approved draft (conversation 8, model 3), sequence and timing only:
-// the cylinder turns (~0.36 s), the hammer falls, then a live chamber flashes and recoils, a blank
-// one gives a dry click (a small shake, no flame). The CSS classes and keyframes are in style.css;
-// SHOT_TIMING mirrors them for the screen's waits.
+// The shot follows the approved draft (conversation 8, model 3), sequence and timing: the
+// revolver spins and stops on the target (step 4.4b, press-signal.js), the cylinder turns
+// (~0.36 s), the hammer falls, then a Dolu flashes (a full flame, decision Q75) and recoils, a Boş
+// gives a dry click and a small white puff of smoke. The CSS classes and keyframes are in
+// style.css; SHOT_TIMING mirrors them for the screen's waits.
 //
 // Pivots are data, not CSS: each moving part sits in a group moved to its pivot, and the part's
 // own drawing is moved back by the same amount. The part then turns / scales around its local
@@ -14,21 +16,25 @@
 // per-revolver CSS value is the cylinder marks' spacing (--rv-step), set on the element.
 
 import { svg } from './dom.js';
-import { DEFAULT_REVOLVER, FLASH, FLASH_ORIGIN, REVOLVERS, isRevolverId } from './revolvers.js';
+import { DEFAULT_REVOLVER, FLASH, FLASH_ORIGIN, REVOLVERS, SMOKE, isRevolverId } from './revolvers.js';
 
-/** Milliseconds, matching the keyframes in style.css (.revolver.is-live / .is-blank). */
+/**
+ * Milliseconds, matching the keyframes in style.css (.revolver.is-live / .is-blank). Before them
+ * comes the spin's stop (press-signal.js: SPIN_TURN_MS per turn, then SPIN_SETTLE_MS).
+ */
 export const SHOT_TIMING = Object.freeze({
-  aim: 380, // the revolver turns to the target (transition)
+  effect: 440, // the hammer has fallen: flash + recoil (Dolu) or click + smoke (Boş) start
   live: 950, // cylinder 360 + hammer at 380 + flash / recoil until ~950
-  blank: 700, // cylinder 360 + hammer at 380 + click until ~650
-  reducedAim: 0, // Hareketler off (decision Q53)
-  reducedLive: 500, // only the flash and the hammer
-  reducedBlank: 300,
+  blank: 1150, // cylinder 360 + hammer at 380 + click, then the smoke 440 + 700
+  reducedAim: 0, // Hareketler off (decision Q53): no spin, the revolver points at once
+  reducedEffect: 60, // the hammer falls at once; the flash / smoke fades in place
+  reducedLive: 500,
+  reducedBlank: 500,
   hold: 250, // a short pause before the result shows on the seats
 });
 
 /** The classes of the moving parts, which the CSS animations use. */
-export const REVOLVER_PARTS = Object.freeze(['rv-flash', 'rv-body', 'rv-flutes', 'rv-hammer']);
+export const REVOLVER_PARTS = Object.freeze(['rv-flash', 'rv-smoke', 'rv-body', 'rv-flutes', 'rv-hammer']);
 
 let serial = 0; // unique pattern / clip ids for every drawing on the page
 
@@ -72,16 +78,17 @@ export function revolverTree(id, { uid = `rv${++serial}`, className = 'revolver-
       ['path', { d: 'M0 0 H5 M0 0 V5', stroke: data.hatch, 'stroke-width': 1 }]] : null,
     ['clipPath', { id: ids.grip }, ['path', { d: data.grip }]],
     ['clipPath', { id: ids.flutes }, ['rect', { ...flutes.clip }]]].filter(Boolean);
-  // The flash drawing is made for FLASH_ORIGIN: move it to this revolver's muzzle.
+  // The flash and smoke drawings are made for FLASH_ORIGIN: moved to this revolver's muzzle.
+  // They sit inside the body (drawn first, behind the barrel), so they follow the recoil.
   const shift = [pivots.muzzle[0] - FLASH_ORIGIN[0], pivots.muzzle[1] - FLASH_ORIGIN[1]];
   const flash = pivoted(pivots.muzzle, 'rv-flash', [['g', { transform: at(shift) }, ...FLASH]]);
+  const smoke = pivoted(pivots.muzzle, 'rv-smoke', [['g', { transform: at(shift) }, ...SMOKE]]);
   const hammer = pivoted(pivots.hammer, 'rv-hammer', [data.hammer]);
   return ['svg', {
     class: className, width, height, viewBox: '40 0 300 190', 'aria-hidden': 'true', focusable: 'false', 'data-revolver': chosen,
   },
   defs,
-  flash,
-  pivoted(pivots.body, 'rv-body', [...body, hammer])];
+  pivoted(pivots.body, 'rv-body', [flash, smoke, ...body, hammer])];
 }
 
 /**

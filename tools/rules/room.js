@@ -18,6 +18,7 @@ import { membersRules } from './members.js';
 import { metaRules } from './meta.js';
 import { namesRules } from './names.js';
 import { presenceRules } from './presence.js';
+import { pressRules } from './press.js';
 import { resultsRules } from './results.js';
 import { seatsRules } from './seats.js';
 import { secretsRules } from './secrets.js';
@@ -53,6 +54,7 @@ export function roomRules() {
     secrets: secretsRules(),
     claims: claimsRules(),
     presence: presenceRules(),
+    press: pressRules(),
     names: namesRules(),
     match: matchRules(),
     results: resultsRules(),

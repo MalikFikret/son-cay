@@ -2,12 +2,14 @@
 // pointer events and the time).
 //
 // - A quick press (released inside the button before LONG_PRESS_MS) fires at once.
-// - A long press cocks the hammer (phase 'cocked'): it stays cocked and the revolver trembles
-//   until the finger is released. Released INSIDE the button: fire. Slid OUT of the button:
-//   uncock and cancel (the hint "Vazgeçmek için dışarı kaydır" is shown while pressing).
+// - A long press cocks the hammer (phase 'cocked'): it stays cocked and the revolver spins on
+//   every screen (step 4.4b, decisions Q55 / Q74; no tremble) until the finger is released.
+//   Released INSIDE the button: fire. Slid OUT of the button: uncock and cancel (the hint
+//   "Vazgeçmek için dışarı kaydır" is shown while pressing).
 // - When the time runs out, the turn is lost or the button is disabled during a press, the press
 //   is cancelled ('expire'): the engine's timeout rule applies as it is.
-// Nothing about the press leaves this device.
+// The only thing that leaves this device is THAT a long press is going on (the press signal,
+// written on 'cock', removed after the shot or on 'cancel'), never the target (Q56).
 
 export const LONG_PRESS_MS = 350;
 
@@ -30,7 +32,8 @@ export const isPressing = (state) => state.phase !== PRESS.IDLE;
  *   'leave': the finger left the button; 'expire': time ran out / turn lost / disabled;
  *   pointercancel is an 'expire' too.
  * @returns {{ state: object, effect: null | 'cock' | 'cancel' | { fire: 'quick' | 'long' } }}
- *   'cock': start cocking the hammer; 'cancel': uncock / forget the press (nothing is sent).
+ *   'cock': cock the hammer, start the spin, send the press signal; 'cancel': uncock, stop
+ *   the spin, remove the signal.
  */
 export function pressStep(state, event) {
   const idle = initialPress();
